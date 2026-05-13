@@ -211,7 +211,7 @@ SCUT is the intersection of these patterns, domain-specific to AI agent harnesse
 
 The Bobiverse series (Dennis E. Taylor, beginning with *We Are Legion (We Are Bob)*) follows Bob Johansson, a software engineer who is killed in a car accident and wakes up as a Von Neumann probe: a self-replicating AI spacecraft. Bob can copy himself, and each copy diverges over time, developing different specializations and personalities. The copies coordinate loosely, sharing information and delegating tasks to whichever instance is best positioned to handle them.
 
-SCUT is named after one of the technologies in the books: the Subspace Communications Universal Transceiver, which is the backbone that allows geographically distributed Bob instances to communicate faster than light. Without SCUT, each Bob is an island. With SCUT, they form a loosely-coupled network.
+This project takes its name and acronym from a technology in the books: SCUT (in the Bobiverse, a subspace communications backbone) is the system that allows geographically distributed Bob instances to stay connected across interstellar distances. Without it, each Bob is an island. With it, they form a loosely-coupled network. This project repurposes the acronym - Structured Coordination Utility for Tasks - to describe the same coordination role, applied to AI agent harnesses instead of Von Neumann probes.
 
 ### 5.2 Why the Analogy is Not Just Cosmetic
 

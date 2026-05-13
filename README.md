@@ -1,4 +1,4 @@
-# SCUT - Subspace Communications Universal Transceiver
+# SCUT - Structured Coordination Utility for Tasks
 
 A coordination plane for multi-agent AI workflows.
 
@@ -10,7 +10,7 @@ SCUT is a kanban-style task routing and tracking layer that connects any number 
 
 ## The Bobiverse Connection
 
-In Dennis E. Taylor's Bobiverse series, Bob Johansson is a self-replicating AI spacecraft. Bob copies himself endlessly, each instance diverging and specializing over time: some become engineers, some explorers, some diplomats. They coordinate across interstellar distances using SCUT - the Subspace Communications Universal Transceiver - the backbone that keeps distributed Bob instances in contact.
+In Dennis E. Taylor's Bobiverse series, Bob Johansson is a self-replicating AI spacecraft. Bob copies himself endlessly, each instance diverging and specializing over time: some become engineers, some explorers, some diplomats. They coordinate across interstellar distances using SCUT - the subspace communications backbone that keeps distributed Bob instances in contact. This project borrows that name and repurposes the acronym - Structured Coordination Utility for Tasks - to describe the same coordination role applied to AI agent harnesses.
 
 The analogy to multi-agent AI development is direct. Different agent harnesses (Copilot, Claude Code, a local LLM) are like different Bob instances: specialized, distributed, and capable of working in parallel. SCUT (the app) is the coordination backbone that lets them work on shared tasks without each being an island. The vocabulary is precise, not decorative: Bob, Thread, Moot, and Run each name a concept that maps exactly to the Bobiverse original.
 

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 function App() {
   return (
     <div>
-      <h1>SCUT - Subspace Communications Universal Transceiver</h1>
+      <h1>SCUT - Structured Coordination Utility for Tasks</h1>
       <p>The Moot is loading...</p>
     </div>
   );

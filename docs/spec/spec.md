@@ -14,7 +14,7 @@
 
 ## 1. Executive Summary
 
-SCUT (Subspace Communications Universal Transceiver) is an agnostic multi-agent coordination plane: a kanban-style task routing and tracking layer that connects to any AI agent harness (GitHub Copilot CLI, Claude Code, OpenAI Codex, Gemini, and others). SCUT maintains a persistent record of work (Threads), tracks each agent invocation (Runs), stores conversation history (Messages), and provides a board view (the Moot) where humans can assign, monitor, and review work across all registered agents (Bobs). SCUT is not an agent framework, does not run language models, and does not replace copilot-bridge or any other harness - it is the coordination plane that sits above them.
+SCUT (Structured Coordination Utility for Tasks) is an agnostic multi-agent coordination plane: a kanban-style task routing and tracking layer that connects to any AI agent harness (GitHub Copilot CLI, Claude Code, OpenAI Codex, Gemini, and others). SCUT maintains a persistent record of work (Threads), tracks each agent invocation (Runs), stores conversation history (Messages), and provides a board view (the Moot) where humans can assign, monitor, and review work across all registered agents (Bobs). SCUT is not an agent framework, does not run language models, and does not replace copilot-bridge or any other harness - it is the coordination plane that sits above them.
 
 ---
 
