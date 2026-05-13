@@ -1,0 +1,9 @@
+{
+  "name": "scut",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces --if-present"
+  }
+}
