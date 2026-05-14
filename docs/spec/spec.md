@@ -195,7 +195,7 @@ The `filter_rule` field is a JSON object. The server evaluates it at query time 
 | `assignee_type` | `'user' \| 'replicant' \| 'unassigned'` | Thread assignee_type matches; `'unassigned'` matches null |
 | `assignee_id` | `string` | Thread assignee_id matches exactly |
 | `labels` | `string[]` | Thread metadata.labels contains any of the listed labels |
-| `metadata` | `object` | Arbitrary key/value match against thread metadata |
+| `metadata` | `object` | Shallow subset match: each key in the filter's `metadata` object must be present in the thread's `metadata` JSON with an equal scalar value. Example: `{ "metadata": { "priority": "high" } }` matches any thread where `metadata.priority === "high"`. Nested object and array matching are not supported in Phase 1. |
 
 An empty `filter_rule` (`{}`) matches all threads in the project.
 
@@ -257,6 +257,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'active', -- active | archived
   metadata    TEXT NOT NULL DEFAULT '{}',
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
@@ -296,6 +297,36 @@ CREATE TABLE IF NOT EXISTS columns (
   metadata    TEXT NOT NULL DEFAULT '{}',
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Replicants: registered agent connector instances (Phase 2+)
+-- Table included in schema for continuity; not exposed via API in Phase 1.
+CREATE TABLE IF NOT EXISTS replicants (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  harness    TEXT NOT NULL,              -- copilot-bridge | claude-code | subprocess | a2a | acp
+  config     TEXT NOT NULL DEFAULT '{}', -- harness-specific JSON config
+  status     TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
+  metadata   TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Runs: one Replicant invocation against a Thread (Phase 2+)
+-- Table included in schema for continuity; not exposed via API in Phase 1.
+CREATE TABLE IF NOT EXISTS runs (
+  id           TEXT PRIMARY KEY,
+  thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  replicant_id TEXT NOT NULL REFERENCES replicants(id) ON DELETE RESTRICT,
+  status       TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
+  input        TEXT NOT NULL DEFAULT '',
+  output       TEXT,
+  error        TEXT,
+  started_at   TEXT,
+  completed_at TEXT,
+  metadata     TEXT NOT NULL DEFAULT '{}',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Threads: unit of work (Phase 1) and persistent agent session (Phase 2+)
@@ -351,37 +382,8 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Replicants: registered agent connector instances (Phase 2+)
--- Table included in schema for continuity; not exposed via API in Phase 1.
-CREATE TABLE IF NOT EXISTS replicants (
-  id         TEXT PRIMARY KEY,
-  name       TEXT NOT NULL UNIQUE,
-  harness    TEXT NOT NULL,              -- copilot-bridge | claude-code | subprocess | a2a | acp
-  config     TEXT NOT NULL DEFAULT '{}', -- harness-specific JSON config
-  status     TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
-  metadata   TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Runs: one Replicant invocation against a Thread (Phase 2+)
--- Table included in schema for continuity; not exposed via API in Phase 1.
-CREATE TABLE IF NOT EXISTS runs (
-  id           TEXT PRIMARY KEY,
-  thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-  replicant_id TEXT NOT NULL REFERENCES replicants(id) ON DELETE RESTRICT,
-  status       TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
-  input        TEXT NOT NULL DEFAULT '',
-  output       TEXT,
-  error        TEXT,
-  started_at   TEXT,
-  completed_at TEXT,
-  metadata     TEXT NOT NULL DEFAULT '{}',
-  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_projects_status        ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_boards_project         ON boards(project_id);
 CREATE INDEX IF NOT EXISTS idx_columns_board          ON columns(board_id);
 CREATE INDEX IF NOT EXISTS idx_threads_project        ON threads(project_id);
@@ -434,6 +436,8 @@ Local accounts only. JWT (JSON Web Tokens) for session management. Future: GitHu
 
 - `POST /api/auth/register` creates a user. Password is hashed with bcrypt (cost factor configurable via `BCRYPT_ROUNDS`, default 12).
 - `POST /api/auth/login` verifies credentials and returns a signed JWT (HS256, configurable expiry via `JWT_EXPIRY`, default `24h`). Token is stored by the client.
+- JWT payload claims: `{ sub: <userId>, username: <username>, iat: <issued-at>, exp: <expiry> }`. The `sub` claim is the user's `id`. `GET /api/auth/me` queries the database using `sub` rather than deserialising user fields from the token — this ensures PATCH /api/auth/me changes are reflected immediately without re-login.
+- Auth middleware attaches `request.user` as `{ id: string, username: string }` (decoded from JWT sub + username claims, not a DB lookup on every request).
 - All protected endpoints require `Authorization: Bearer <token>` header.
 - `GET /api/auth/me` returns the current user decoded from the token.
 - `POST /api/auth/logout` is a client-side operation (discard token); no server-side blocklist in Phase 1.
@@ -521,9 +525,22 @@ export interface IRepository {
   runs:           IRunRepository;          // Phase 2+
 }
 
+export interface IProjectRepository {
+  findAll(filters?: { include_archived?: boolean }): Promise<Project[]>;
+  findById(id: string): Promise<Project | null>;
+  create(input: CreateProjectInput): Promise<Project>;
+  update(id: string, input: UpdateProjectInput): Promise<Project>;
+  archive(id: string): Promise<void>; // sets status = 'archived', does not delete
+}
+
 export interface IThreadRepository {
   findById(id: string): Promise<Thread | null>;
   findByProject(projectId: string, filters?: ThreadFilters): Promise<Thread[]>;
+  /**
+   * Returns threads matching the column's filter_rule.
+   * Resolves project scope by joining: columns.board_id -> boards.project_id.
+   * An empty filter_rule {} matches all threads in the project.
+   */
   findByColumn(columnId: string): Promise<Thread[]>; // evaluates column filter_rule
   create(input: CreateThreadInput): Promise<Thread>;
   update(id: string, input: UpdateThreadInput): Promise<Thread>;
@@ -544,6 +561,13 @@ export interface IChecklistItemRepository {
   create(input: CreateChecklistItemInput): Promise<ChecklistItem>;
   update(id: string, input: UpdateChecklistItemInput): Promise<ChecklistItem>;
   delete(id: string): Promise<void>;
+  /**
+   * Promotes a ChecklistItem to a Thread.
+   * Resolves parent thread id by joining: checklist_items.checklist_id -> checklists.thread_id.
+   * Sets the new Thread's parent_id to that thread id.
+   * Sets promoted_thread_id on the ChecklistItem to the new Thread's id.
+   * Throws if the item's promoted_thread_id is already set (already promoted).
+   */
   promote(id: string): Promise<Thread>; // creates Thread with parent_id, returns the new Thread
 }
 
@@ -688,6 +712,7 @@ All endpoints return JSON. Error responses: `{ error: string, code?: string }`. 
 | `POST` | `/api/auth/login` | Login. Body: `{ username, password }`. Returns: `{ token, user }` |
 | `GET` | `/api/auth/me` | Get current user from JWT. Auth required. |
 | `PATCH` | `/api/auth/me` | Update own `display_name`, `avatar_url`, or `password`. Auth required. |
+| `POST` | `/api/auth/logout` | Client-side operation. Server returns 204. No server-side token blocklist in Phase 1. Client must discard the token. Auth required. |
 
 ### 11.2 Users
 
@@ -706,7 +731,7 @@ Note: user creation is via `/api/auth/register` only. No admin user management U
 | `POST` | `/api/projects` | Create project. Body: `{ name, description?, metadata? }` |
 | `GET` | `/api/projects/:id` | Get project by ID |
 | `PATCH` | `/api/projects/:id` | Update project. Body: any subset of `{ name, description, metadata }` |
-| `DELETE` | `/api/projects/:id` | Archive project |
+| `DELETE` | `/api/projects/:id` | Soft-delete: sets `status = 'archived'`. Cascades to boards, columns, and threads are NOT applied on archive — only on hard delete. Archived projects are excluded from `GET /api/projects` by default. Pass `?include_archived=true` to include them. |
 
 ### 11.4 Boards
 
@@ -732,7 +757,7 @@ Note: user creation is via `/api/auth/register` only. No admin user management U
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/projects/:id/threads` | List threads. Query params: `status`, `assignee_type`, `assignee_id`, `label`, `metadata.*` |
+| `GET` | `/api/projects/:id/threads` | List threads. Query params: `status`, `assignee_type`, `assignee_id`, `labels`, `metadata.*` (filter_rule key names match query param names) |
 | `POST` | `/api/projects/:id/threads` | Create thread. Body: `{ title, description?, status?, assignee_type?, assignee_id?, metadata?, parent_id? }` |
 | `GET` | `/api/threads/:id` | Get thread with comments, checklists, latest run |
 | `PATCH` | `/api/threads/:id` | Update. Body: any subset of `{ title, description, status, assignee_type, assignee_id, metadata }` |
@@ -763,9 +788,10 @@ Note: user creation is via `/api/auth/register` only. No admin user management U
 |--------|------|-------------|
 | `GET` | `/api/checklists/:id/items` | List items in checklist |
 | `POST` | `/api/checklists/:id/items` | Create item. Body: `{ title, position?, assignee_type?, assignee_id?, metadata? }` |
+| `GET` | `/api/checklist-items/:id` | Get checklist item by ID. Returns full item including `promoted_thread_id` if promoted. |
 | `PATCH` | `/api/checklist-items/:id` | Update. Body: any subset of `{ title, done, position, assignee_type, assignee_id, metadata }` |
 | `DELETE` | `/api/checklist-items/:id` | Delete item |
-| `POST` | `/api/checklist-items/:id/promote` | Promote item to Thread. Creates new Thread with `parent_id` = item's `thread_id`. Returns new Thread. Sets `promoted_thread_id` on the ChecklistItem. |
+| `POST` | `/api/checklist-items/:id/promote` | Promote item to Thread. Creates a new Thread in the same project as the checklist's parent thread. New Thread defaults: `title` = item's `title`, `description` = `''`, `status` = `'todo'`, `assignee_type` = item's `assignee_type`, `assignee_id` = item's `assignee_id`, `parent_id` = item's parent thread id (resolved via checklist join). Sets `promoted_thread_id` on the ChecklistItem to the new Thread's id. If `promoted_thread_id` is already set, returns 409 with `{ error: "already promoted", code: "ALREADY_PROMOTED" }`. Optional request body: `{ title?: string, description?: string, status?: string }` to override defaults. |
 
 ### 11.10 Replicants (Phase 2+)
 
@@ -775,7 +801,7 @@ Note: user creation is via `/api/auth/register` only. No admin user management U
 | `POST` | `/api/replicants` | Register replicant. Body: `{ name, harness, config, metadata? }` |
 | `GET` | `/api/replicants/:id` | Get replicant |
 | `PATCH` | `/api/replicants/:id` | Update config or metadata |
-| `DELETE` | `/api/replicants/:id` | Deregister |
+| `DELETE` | `/api/replicants/:id` | Deregister. Returns 409 if the Replicant has associated runs (`runs.replicant_id` FK is `ON DELETE RESTRICT`). Delete or reassign all runs for this Replicant before deregistering. |
 
 ### 11.11 Runs (Phase 2+)
 
@@ -873,7 +899,7 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 
 **Sub-phases:**
 
-| Block | ID | Description |
+| Block | Name | Description |
 |-------|----|-------------|
 | P1-A | DB Layer | Schema, migration runner, IRepository interfaces, SQLiteRepository for all Phase 1 entities |
 | P1-B | Auth | JWT middleware, register, login, me endpoints, bcrypt |

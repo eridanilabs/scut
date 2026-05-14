@@ -87,6 +87,7 @@
 | P1-D-03 | `GET /api/checklists/:id/items`, `POST /api/checklists/:id/items` | pending |
 | P1-D-04 | `PATCH /api/checklist-items/:id`, `DELETE /api/checklist-items/:id` | pending |
 | P1-D-05 | `POST /api/checklist-items/:id/promote` (create Thread with `parent_id`, set `promoted_thread_id` on item, return new Thread) | pending |
+| P1-D-06 | `GET /api/checklist-items/:id` | pending |
 
 ---
 
