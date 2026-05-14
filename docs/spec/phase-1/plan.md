@@ -7,15 +7,24 @@ packages/
   server/               - Fastify API + SQLite + connectors
     src/
       db/
-        migrate.ts      - run migrations on startup
-        schema.sql      - CREATE TABLE statements
-        projects.ts     - Project queries
-        boards.ts       - Board queries
-        columns.ts      - Column queries
-        bobs.ts         - Bob queries
-        threads.ts      - Thread queries
-        messages.ts     - Message queries
-        runs.ts         - Run queries
+        interfaces/
+          IRepository.ts   - root interface and all sub-interfaces
+          types.ts         - shared input/filter/output types
+        adapters/
+          sqlite/
+            index.ts       - SQLiteRepository implements IRepository
+            projects.ts
+            boards.ts
+            columns.ts
+            bobs.ts
+            threads.ts
+            messages.ts
+            runs.ts
+            schema.sql     - CREATE TABLE statements
+            migrate.ts     - idempotent migration runner
+          postgres/
+            index.ts       - PostgresRepository (Phase 3+)
+        index.ts           - factory: createRepository(driver) -> IRepository
       connectors/
         IReplicantConnector.ts   - interface + shared types
         CopilotBridgeConnector.ts - Phase 1 reference connector (copilot-bridge HTTP)
@@ -70,10 +79,13 @@ The work follows a strict backend-first, then frontend order. Each block is inde
 
 ### Block 1: DB Layer
 
-- `schema.sql` matching the full spec data model: projects, boards, columns, bobs, threads, messages, runs
-- `migrate.ts`: reads schema.sql, runs on startup, idempotent
-- Query modules: typed wrappers for insert/select/update on each table
-- No ORM. better-sqlite3 only.
+- Define `IRepository` root interface and all sub-interfaces (`IProjectRepository`, `IBoardRepository`, `IColumnRepository`, `IBobRepository`, `IThreadRepository`, `IMessageRepository`, `IRunRepository`) in `db/interfaces/`
+- All interface methods are async (`Promise<T>`) - works for both SQLite and Postgres
+- Implement `SQLiteRepository` in `db/adapters/sqlite/` using better-sqlite3 (sync calls wrapped in promises)
+- `schema.sql` matching the full spec data model
+- `migrate.ts`: idempotent, runs on startup
+- `db/index.ts` factory: `createRepository(driver)` reads `DATABASE_DRIVER` env var, returns `IRepository`
+- Route handlers receive `IRepository` via Fastify decoration - no raw SQL outside adapters
 
 ### Block 2: API Routes
 
@@ -183,7 +195,9 @@ Replace TanStack Query with fetch + zustand. No `@tanstack/react-query` dependen
 
 ```
 PORT=3000
-DATABASE_PATH=./scut.db
+DATABASE_DRIVER=sqlite          # sqlite | postgres
+DATABASE_PATH=./scut.db         # sqlite only
+# DATABASE_URL=postgresql://... # postgres only
 # For seeding the default Bob (Phase 1 uses copilot-bridge connector):
 DEFAULT_BOB_HARNESS=copilot-bridge
 COPILOT_BRIDGE_URL=http://localhost:4000

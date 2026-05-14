@@ -9,10 +9,11 @@
 5. [Data Hierarchy](#5-data-hierarchy)
 6. [Data Model](#6-data-model)
 7. [Real-Time and Bidirectional Data](#7-real-time-and-bidirectional-data)
-8. [Connector Interface](#8-connector-interface)
-9. [API Surface](#9-api-surface)
-10. [Connector Implementations (Planned)](#10-connector-implementations-planned)
-11. [Phase Plan](#11-phase-plan)
+8. [Database Adapter Interface](#8-database-adapter-interface)
+9. [Connector Interface](#9-connector-interface)
+10. [API Surface](#10-api-surface)
+11. [Connector Implementations (Planned)](#11-connector-implementations-planned)
+12. [Phase Plan](#12-phase-plan)
 
 ---
 
@@ -45,6 +46,18 @@ Opening a Thread is opening a persistent agent session. The full message history
 ### Metadata as First-Class
 
 Every entity carries a `metadata` JSON field. This is intentional: it enables filtering, custom views, tagging, labeling, and priority without schema changes. Standard fields (priority, labels, estimate) are conventions on top of metadata, not columns.
+
+### Pluggable Storage
+
+The database layer is accessed through a repository interface, not directly. Route handlers and business logic call repository methods (`IProjectRepository`, `IThreadRepository`, etc.). The concrete implementation is injected at startup.
+
+Phase 1 ships `SQLiteRepository` (better-sqlite3, synchronous). A `PostgresRepository` can be swapped in without touching any route handler or connector code. The interface is the contract; the storage engine is a deployment detail.
+
+Consequences:
+- All DB access goes through typed repository interfaces
+- No raw SQL in route handlers or connectors
+- `IRepository` implementations live in `packages/server/src/db/adapters/`
+- The active adapter is selected by `DATABASE_DRIVER` env var (`sqlite` | `postgres`)
 
 ### Hierarchy Owned by SCUT, Not the Board
 
@@ -365,7 +378,85 @@ The same flow works for an agent client: the agent POSTs a message to the API ju
 ---
 
 
-## 8. Connector Interface
+---
+
+## 8. Database Adapter Interface
+
+SCUT's database layer is accessed exclusively through typed repository interfaces. Route handlers call repository methods; they never touch SQL or a DB client directly. This is the seam that makes storage engines swappable.
+
+### 8.1 Interface Pattern
+
+Each entity group has its own repository interface. All methods are async (return `Promise<T>`), even in the Phase 1 SQLite implementation, so the interface works uniformly when Postgres (inherently async) is introduced.
+
+```typescript
+// Minimal example - each entity follows this shape
+export interface IThreadRepository {
+  findById(id: string): Promise<Thread | null>;
+  findByProject(projectId: string, filters?: ThreadFilters): Promise<Thread[]>;
+  create(input: CreateThreadInput): Promise<Thread>;
+  update(id: string, input: UpdateThreadInput): Promise<Thread>;
+  archive(id: string): Promise<void>;
+}
+
+// Root interface: one instance, all repositories
+export interface IRepository {
+  projects:  IProjectRepository;
+  boards:    IBoardRepository;
+  columns:   IColumnRepository;
+  bobs:      IBobRepository;
+  threads:   IThreadRepository;
+  messages:  IMessageRepository;
+  runs:      IRunRepository;
+}
+```
+
+The server receives a single `IRepository` instance at startup and passes it to all route handlers via Fastify's dependency injection (decorated on the `fastify` instance).
+
+### 8.2 Implementations
+
+| Adapter | Driver | Phase | Notes |
+|---------|--------|-------|-------|
+| `SQLiteRepository` | better-sqlite3 (sync, wrapped in promises) | 1 | Default. File-based. Zero config. |
+| `PostgresRepository` | `pg` or `postgres` | Future | For multi-user or hosted deployments. |
+
+### 8.3 Directory Layout
+
+```
+packages/server/src/db/
+  interfaces/
+    IRepository.ts          - root interface and all sub-interfaces
+    types.ts                - shared input/filter/output types
+  adapters/
+    sqlite/
+      index.ts              - SQLiteRepository implements IRepository
+      projects.ts
+      boards.ts
+      columns.ts
+      bobs.ts
+      threads.ts
+      messages.ts
+      runs.ts
+      schema.sql            - CREATE TABLE statements
+      migrate.ts            - idempotent migration runner
+    postgres/
+      index.ts              - PostgresRepository (Phase 3+)
+  index.ts                  - factory: createRepository(driver) -> IRepository
+```
+
+### 8.4 Driver Selection
+
+```
+DATABASE_DRIVER=sqlite    # default
+DATABASE_PATH=./scut.db
+
+# For postgres (future):
+DATABASE_DRIVER=postgres
+DATABASE_URL=postgresql://user:pass@host:5432/scut
+```
+
+---
+
+## 9. Connector Interface
 
 Every Bob connector implements `IReplicantConnector`. The interface is intentionally thin: SCUT's job is to route and track, not to dictate how the harness works internally.
 
@@ -423,7 +514,7 @@ export interface IReplicantConnector {
 }
 ```
 
-### 8.1 Connector Contract Notes
+### 9.1 Connector Contract Notes
 
 - `dispatch` is fire-and-forget. SCUT creates the Run record before calling dispatch. The connector may update the Run status to `queued` or `running` synchronously, but the result arrives later via the callback.
 - `cancel` is best-effort. Some harnesses may not support mid-run cancellation. Connectors should set Run status to `cancelled` and resolve without throwing if cancellation is not possible.
@@ -431,11 +522,11 @@ export interface IReplicantConnector {
 
 ---
 
-## 9. API Surface
+## 10. API Surface
 
 All endpoints return JSON. Error responses use `{ error: string, code?: string }`. The full OpenAPI 3.1 spec is served at `/api/docs` and committed to `docs/api/openapi.yaml`.
 
-### 9.1 Projects
+### 10.1 Projects
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -446,7 +537,7 @@ All endpoints return JSON. Error responses use `{ error: string, code?: string }
 | `DELETE` | `/api/projects/:id` | Archive project |
 | `GET` | `/api/projects/:id/events` | SSE stream for whole project |
 
-### 9.2 Boards
+### 10.2 Boards
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -456,7 +547,7 @@ All endpoints return JSON. Error responses use `{ error: string, code?: string }
 | `PATCH` | `/api/boards/:id` | Update board |
 | `DELETE` | `/api/boards/:id` | Delete board |
 
-### 9.3 Columns
+### 10.3 Columns
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -465,7 +556,7 @@ All endpoints return JSON. Error responses use `{ error: string, code?: string }
 | `PATCH` | `/api/columns/:id` | Update column (name, position, filter) |
 | `DELETE` | `/api/columns/:id` | Delete column |
 
-### 9.4 Threads
+### 10.4 Threads
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -478,14 +569,14 @@ All endpoints return JSON. Error responses use `{ error: string, code?: string }
 
 Query params for `GET /api/projects/:id/threads`: `status`, `bobId`, `label`, `metadata.*` (arbitrary metadata filter).
 
-### 9.5 Messages
+### 10.5 Messages
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/threads/:id/messages` | List messages on a thread |
 | `POST` | `/api/threads/:id/messages` | Add message (triggers Run if Bob assigned) |
 
-### 9.6 Runs
+### 10.6 Runs
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -493,7 +584,7 @@ Query params for `GET /api/projects/:id/threads`: `status`, `bobId`, `label`, `m
 | `POST` | `/api/threads/:id/runs` | Manually dispatch a run |
 | `DELETE` | `/api/runs/:id` | Cancel a run |
 
-### 9.7 Bobs
+### 10.7 Bobs
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -503,7 +594,7 @@ Query params for `GET /api/projects/:id/threads`: `status`, `bobId`, `label`, `m
 | `PATCH` | `/api/bobs/:id` | Update Bob config |
 | `DELETE` | `/api/bobs/:id` | Deregister Bob |
 
-### 9.8 Internal (Connector Callback)
+### 10.8 Internal (Connector Callback)
 
 #### `POST /api/internal/runs/:id/result`
 
@@ -522,7 +613,7 @@ Side effects: updates Run, creates Message (author=bob), emits SSE events.
 
 ---
 
-## 10. Connector Implementations (Planned)
+## 11. Connector Implementations (Planned)
 
 ### `CopilotBridgeConnector`
 
@@ -569,7 +660,7 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 
 ---
 
-## 11. Phase Plan
+## 12. Phase Plan
 
 ### Phase 1 - MVP
 
