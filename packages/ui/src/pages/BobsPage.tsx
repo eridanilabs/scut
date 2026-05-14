@@ -78,7 +78,7 @@ function AddReplicantDialog({
             <Label htmlFor="rep-name">Name</Label>
             <Input
               id="rep-name"
-              placeholder="e.g. Copilot Bridge"
+              placeholder="e.g. Bob"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -88,7 +88,7 @@ function AddReplicantDialog({
             <Label htmlFor="rep-harness">Harness</Label>
             <Input
               id="rep-harness"
-              placeholder="e.g. copilot-bridge"
+              placeholder="e.g. Copilot"
               value={harness}
               onChange={(e) => setHarness(e.target.value)}
             />
