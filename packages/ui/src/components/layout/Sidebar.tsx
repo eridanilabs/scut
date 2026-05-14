@@ -64,7 +64,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               active
                 ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              collapsed ? 'size-11 justify-center' : 'min-h-10 gap-2.5 px-2.5 py-2 w-full',
+              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2.5 py-2 w-full',
             );
 
             if (collapsed) {
@@ -94,7 +94,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
           <TooltipTrigger
             className={cn(
               'flex items-center rounded-lg transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              collapsed ? 'size-11 justify-center' : 'min-h-10 gap-2.5 px-2.5 py-2 w-full',
+              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2.5 py-2 w-full',
             )}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={toggleSidebar}
