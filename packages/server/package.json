@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "seed": "tsx src/seed-bob.ts"
   },
   "dependencies": {
     "fastify": "^4.28.0",
