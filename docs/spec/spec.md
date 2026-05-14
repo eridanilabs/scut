@@ -41,38 +41,33 @@ The pattern: `Bob` is the entity. `IReplicantConnector` is the interface. Each `
 
 ## 2. Architecture Diagram
 
-```
-+----------------------------------------------------------+
-|                   Human Operator                         |
-|                                                          |
-|   +--------------------------------------------------+   |
-|   |              SCUT Moot (React UI)                |   |
-|   |   Thread board   |   Run history   |   Bob list  |   |
-|   +--------------------------------------------------+   |
-|                        |                                 |
-+------------------------|---------------------------------+
-                         | HTTP / SSE
-+------------------------|---------------------------------+
-|                SCUT Server (Fastify)                     |
-|                                                          |
-|   +------------+  +------------+  +------------------+  |
-|   |  /threads  |  |   /bobs    |  |  /internal/runs  |  |
-|   |  /messages |  |   /runs    |  |  (result callback)|  |
-|   +------------+  +------------+  +------------------+  |
-|                                                          |
-|   +--------------------------------------------------+   |
-|   |              IReplicantConnector interface         |   |
-|   +--------+----------+-----------+------------------+   |
-|            |          |           |                       |
-+------------|----------|-----------|---------------------  |
-             |          |           |
-   +---------+--------+ +----------+--+ +--------------+
-   |CopilotBridge     | |ClaudeCode   | |  A2A         |
-   |Connector         | |Connector    | |  Connector   |
-   +-------------+ +-----------+ +-------------+
-          |              |              |
-   copilot-bridge   claude CLI     remote A2A
-   HTTP channel     subprocess      agent
+```mermaid
+flowchart TB
+    HO["Human Operator"]
+
+    subgraph moot["SCUT Moot (React UI)"]
+        TB["Thread Board"]
+        RH["Run History"]
+        BL["Bob List"]
+    end
+
+    subgraph server["SCUT Server (Fastify)"]
+        API["REST API\n/threads  /messages\n/bobs  /runs"]
+        CB["/internal/runs\n(result callback)"]
+        IRC["IReplicantConnector"]
+    end
+
+    CBC["CopilotBridgeConnector\n(copilot-bridge HTTP)"]
+    CCC["ClaudeCodeConnector\n(claude CLI subprocess)"]
+    A2AC["A2AConnector\n(remote A2A agent)"]
+
+    HO --> moot
+    moot -->|HTTP / SSE| API
+    API --> IRC
+    CB --> IRC
+    IRC --> CBC
+    IRC --> CCC
+    IRC --> A2AC
 ```
 
 ---
@@ -143,11 +138,18 @@ CREATE TABLE IF NOT EXISTS runs (
 
 ### 3.3 Thread Status Flow
 
-```
-idea --> refining --> ready --> in_progress --> done
-  |                    |            |
-  |                    v            v
-  +--------------> blocked ------> archived
+```mermaid
+stateDiagram-v2
+    [*] --> idea
+    idea --> refining
+    idea --> blocked
+    refining --> ready
+    ready --> in_progress
+    ready --> blocked
+    in_progress --> done
+    in_progress --> blocked
+    blocked --> archived
+    done --> archived
 ```
 
 - **idea**: captured but not yet specified
@@ -160,11 +162,14 @@ idea --> refining --> ready --> in_progress --> done
 
 ### 3.4 Run Status Flow
 
-```
-created --> queued --> running --> completed
-                |          |
-                v          v
-            cancelled    failed
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> queued
+    queued --> running
+    queued --> cancelled
+    running --> completed
+    running --> failed
 ```
 
 ---

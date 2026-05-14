@@ -166,27 +166,34 @@ SCUT operates at the coordination layer, above MCP. A Bob running inside copilot
 
 ### 3.5 SCUT's Position
 
-```
-+----------------------------------+
-|         Human operator           |
-|         SCUT Moot (UI)           |
-+----------------------------------+
-|         SCUT server              |
-|  Thread / Run / Message / Bob    |
-+----------------------------------+
-|       Connector interface        |
-|       Connector interface        |
-|  IReplicantConnector             |
-+----------+----------+------------+
-           |          |
-    +------+--------+  +---------+  +---------+
-    |CopilotBridge  |  |A2A      |  |ACP      |
-    |Connector      |  |Connector|  |Connector|
-    |subprocess     |  |HTTP+A2A |  |HTTP+ACP |
-    +---------------+  +---------+  +---------+
-           |          |              |
-      copilot-   remote A2A     local ACP
-      bridge     agent         agent
+```mermaid
+flowchart TB
+    HO["Human Operator"]
+
+    subgraph moot["SCUT Moot (UI)"]
+    end
+
+    subgraph scut["SCUT Server"]
+        data["Thread / Run / Message / Bob"]
+        irc["IReplicantConnector"]
+    end
+
+    CBC["CopilotBridgeConnector\n(copilot-bridge HTTP)"]
+    A2AC["A2AConnector\n(HTTP + A2A)"]
+    ACPC["ACPConnector\n(HTTP + ACP)"]
+
+    CB["copilot-bridge"]
+    RA["remote A2A agent"]
+    LA["local ACP agent"]
+
+    HO --> moot
+    moot --> scut
+    irc --> CBC
+    irc --> A2AC
+    irc --> ACPC
+    CBC --> CB
+    A2AC --> RA
+    ACPC --> LA
 ```
 
 A2A and ACP are transport options behind SCUT's connector interface. A team can run `CopilotBridgeConnector` for local Copilot work, `A2AConnector` for a cloud-hosted specialist agent, and `ACPConnector` for a local LLM - all on the same SCUT board, tracked in the same Thread history.
