@@ -3,92 +3,267 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [Architecture Diagram](#2-architecture-diagram)
-3. [Data Model](#3-data-model)
-4. [Connector Interface](#4-connector-interface)
-5. [API Surface](#5-api-surface)
-6. [Connector Implementations (Planned)](#6-connector-implementations-planned)
-7. [Phase Plan](#7-phase-plan)
+2. [Design Principles](#2-design-principles)
+3. [Vocabulary](#3-vocabulary)
+4. [Application Architecture](#4-application-architecture)
+5. [Data Hierarchy](#5-data-hierarchy)
+6. [Data Model](#6-data-model)
+7. [Real-Time and Bidirectional Data](#7-real-time-and-bidirectional-data)
+8. [Database Adapter Interface](#8-database-adapter-interface)
+9. [Connector Interface](#9-connector-interface)
+10. [API Surface](#10-api-surface)
+11. [Connector Implementations (Planned)](#11-connector-implementations-planned)
+12. [Phase Plan](#12-phase-plan)
 
 ---
 
 ## 1. Executive Summary
 
-SCUT (Structured Coordination Utility for Tasks) is an agnostic multi-agent coordination plane: a kanban-style task routing and tracking layer that connects to any AI agent harness (GitHub Copilot CLI, Claude Code, OpenAI Codex, Gemini, and others). SCUT maintains a persistent record of work (Threads), tracks each agent invocation (Runs), stores conversation history (Messages), and provides a board view (the Moot) where humans can assign, monitor, and review work across all registered agents (Bobs). SCUT is not an agent framework, does not run language models, and does not replace copilot-bridge or any other harness - it is the coordination plane that sits above them.
+SCUT (Structured Coordination Utility for Tasks) is an agnostic multi-agent coordination plane: a project and task management system where every unit of work is also a discrete agent session. SCUT maintains a full hierarchy of work (Organizations > Projects > Boards > Columns > Threads), tracks each agent invocation (Runs), stores conversation history (Messages), and provides a board view (the Moot) where humans can assign, monitor, and review work across all registered agents (Bobs).
+
+SCUT is API-first. The UI is a consumer of the API, not a privileged client. An agent can do everything a human can: create a project, move a thread, add a comment, dispatch a run, reorganize a board. The REST API is the system's contract, and it is fully documented (OpenAPI) and updated alongside every new endpoint.
+
+SCUT is not an agent framework, does not run language models, and does not replace copilot-bridge or any other harness - it is the coordination plane that sits above them.
 
 ---
 
-## 2. Architecture Diagram
+## 2. Design Principles
 
-```
-+----------------------------------------------------------+
-|                   Human Operator                         |
-|                                                          |
-|   +--------------------------------------------------+   |
-|   |              SCUT Moot (React UI)                |   |
-|   |   Thread board   |   Run history   |   Bob list  |   |
-|   +--------------------------------------------------+   |
-|                        |                                 |
-+------------------------|---------------------------------+
-                         | HTTP / SSE
-+------------------------|---------------------------------+
-|                SCUT Server (Fastify)                     |
-|                                                          |
-|   +------------+  +------------+  +------------------+  |
-|   |  /threads  |  |   /bobs    |  |  /internal/runs  |  |
-|   |  /messages |  |   /runs    |  |  (result callback)|  |
-|   +------------+  +------------+  +------------------+  |
-|                                                          |
-|   +--------------------------------------------------+   |
-|   |              IBobConnector interface              |   |
-|   +--------+----------+-----------+------------------+   |
-|            |          |           |                       |
-+------------|----------|-----------|---------------------  |
-             |          |           |
-   +---------+--+ +-----+-----+ +--+----------+
-   |CopilotBridge| |ClaudeCode | |  A2ABob     |
-   |    Bob      | |   Bob     | |             |
-   +-------------+ +-----------+ +-------------+
-          |              |              |
-   copilot-bridge   claude CLI     remote A2A
-   HTTP channel     subprocess      agent
-```
+### API-First
+
+Every entity in SCUT is fully addressable via REST API. The React UI is one client of that API. An agent connector is another. A CLI tool could be a third. No capability exists only in the UI.
+
+Consequences:
+- Every create/read/update/delete operation has a corresponding API endpoint
+- API is documented (OpenAPI 3.1) and the docs are generated from code
+- API schema is the source of truth; UI is derived from it
+- Agents can reorganize boards, move cards, create projects, and dispatch runs - all via API
+
+### Thread = Agent Session
+
+Opening a Thread is opening a persistent agent session. The full message history is the context. A Run is one turn in that session - dispatched to whichever Bob is currently assigned. Reassigning a Bob mid-thread is valid; the new Bob receives the full history as context.
+
+### Metadata as First-Class
+
+Every entity carries a `metadata` JSON field. This is intentional: it enables filtering, custom views, tagging, labeling, and priority without schema changes. Standard fields (priority, labels, estimate) are conventions on top of metadata, not columns.
+
+### Pluggable Storage
+
+The database layer is accessed through a repository interface, not directly. Route handlers and business logic call repository methods (`IProjectRepository`, `IThreadRepository`, etc.). The concrete implementation is injected at startup.
+
+Phase 1 ships `SQLiteRepository` (better-sqlite3, synchronous). A `PostgresRepository` can be swapped in without touching any route handler or connector code. The interface is the contract; the storage engine is a deployment detail.
+
+Consequences:
+- All DB access goes through typed repository interfaces
+- No raw SQL in route handlers or connectors
+- `IRepository` implementations live in `packages/server/src/db/adapters/`
+- The active adapter is selected by `DATABASE_DRIVER` env var (`sqlite` | `postgres`)
+
+### Hierarchy Owned by SCUT, Not the Board
+
+The board (Moot) is a view - a filtered projection of Threads. The data hierarchy (Project > Board > Column > Thread) is owned by the database. Multiple board views can exist over the same set of Threads. Columns are logical groupings (by status, by label, by Bob), not containers.
 
 ---
 
-## 3. Data Model
+## 3. Vocabulary
 
-### 3.1 Entity Overview
+| Term | What it is |
+|------|------------|
+| **Organization** | Top-level tenant. Owns projects and Bobs. Phase 1 assumes single-org. |
+| **Project** | A named collection of Boards and Threads. Roughly equivalent to a repo or initiative. |
+| **Board** | A named view within a Project. Displays Threads organized into Columns. |
+| **Column** | A logical grouping of Threads on a Board. Defined by a filter (status, label, etc.). |
+| **Thread** | The unit of work. A card on a board and a persistent agent session. |
+| **Message** | One turn in a Thread's conversation - from a human, a Bob, or the system. |
+| **Run** | One invocation of a Bob against a Thread. Tracks status, input, and output. |
+| **Bob** | A registered agent connector instance. Named after the Bobiverse replicants. |
+| **Moot** | The React board UI. Where humans see and manage Threads across Projects and Boards. |
+| **IReplicantConnector** | The harness-agnostic connector interface every Bob adapter implements. |
+| **CopilotBridgeConnector** | Phase 1 reference implementation of `IReplicantConnector` for copilot-bridge. |
+| **ClaudeCodeConnector** | Phase 3 connector for the `claude` CLI via subprocess. |
+| **SubprocessConnector** | Phase 3 generic connector for any CLI-based agent harness. |
+| **A2AConnector** | Phase 3 connector for remote agents via the Google A2A protocol. |
+| **ACPConnector** | Phase 4 connector for local agents via the IBM ACP protocol. |
 
-| Entity | Description |
-|---|---|
-| **Bob** | A registered agent connector instance. One per harness instance. |
-| **Thread** | A task and its full conversation history. The unit of work. |
-| **Message** | One message in a Thread - from a human, a Bob, or the system. |
-| **Run** | One invocation of a Bob against a Thread. Tracks status and result. |
+The pattern: `Bob` is the entity. `IReplicantConnector` is the interface. Each `*Connector` is one harness adapter.
 
-### 3.2 SQL Schema
+---
+
+## 4. Application Architecture
+
+### Web Application Model
+
+SCUT is a **SPA + API server** (not SSR):
+
+- **`packages/server`** - Fastify API server. Owns the database, business logic, connector registry, and serves the built UI as static files in production.
+- **`packages/ui`** - React + Vite SPA. Fetches all data from the Fastify API. No server-side rendering.
+
+This model is chosen because:
+- A persistent backend is required regardless (SQLite, connector registry, agent proxying, SSE/WebSocket)
+- SSR adds complexity without benefit here - this is an operator tool, not a public site
+- The API-first principle is cleanest when the UI and API are fully decoupled
+
+In development, Vite proxies `/api` requests to the Fastify server. In production, Fastify serves the Vite build as static files and handles all `/api` routes.
+
+### System Architecture
+
+```mermaid
+flowchart TB
+    HO["Human Operator"]
+    AG["Agent (via IReplicantConnector)"]
+
+    subgraph moot["SCUT Moot (React SPA)"]
+        PV["Project View"]
+        BV["Board View (Moot)"]
+        TV["Thread Detail"]
+    end
+
+    subgraph server["SCUT Server (Fastify)"]
+        API["REST API (OpenAPI documented)"]
+        WS["WebSocket / SSE"]
+        DB["SQLite (better-sqlite3)"]
+        RC["Connector Registry"]
+    end
+
+    CBC["CopilotBridgeConnector"]
+    CCC["ClaudeCodeConnector"]
+    A2AC["A2AConnector"]
+
+    HO --> moot
+    AG -->|HTTP REST| API
+    moot -->|HTTP REST| API
+    moot <-->|WS / SSE| WS
+    API --> DB
+    API --> RC
+    RC --> CBC
+    RC --> CCC
+    RC --> A2AC
+```
+
+### API Documentation
+
+Every endpoint is documented via OpenAPI 3.1. The spec is generated from Fastify's JSON schema validation and served at `/api/docs` (Scalar or Swagger UI). The OpenAPI spec file is committed to the repo at `docs/api/openapi.yaml` and updated with every PR that adds or changes endpoints. Agents and humans use the same docs.
+
+---
+
+## 5. Data Hierarchy
+
+SCUT borrows from established project management taxonomy (Linear, Jira, GitHub Projects) and adapts it to multi-agent coordination:
+
+```
+Organization
+  └── Project (e.g. "scut", "website-redesign")
+        └── Board (e.g. "Sprint 1", "Backlog", "Agent Tasks")
+              └── Column (logical grouping: by status, label, or custom filter)
+                    └── Thread (card + agent session)
+                          ├── Message (human or Bob turn)
+                          └── Run (one Bob invocation)
+```
+
+### Comparison to Common Tools
+
+| SCUT | Linear | Jira | GitHub Projects |
+|------|--------|------|-----------------|
+| Organization | Workspace | Organization | Organization |
+| Project | Team/Project | Project | Project |
+| Board | Project View | Board | View |
+| Column | Status group | Column | Column |
+| Thread | Issue | Story/Task | Item |
+| Message | Comment | Comment | Comment |
+| Run | (none) | (none) | (none - SCUT-specific) |
+| Bob | (none) | (none) | (none - SCUT-specific) |
+| Metadata | Labels + custom fields | Custom fields | Custom fields |
+
+Key difference from all of the above: in SCUT, a Thread is also a **persistent agent session**. A Run is a discrete agent invocation within that session. No other tool in this list has a native concept of dispatching work to an agent and tracking the result as a first-class data entity.
+
+### Metadata Convention
+
+All entities carry a `metadata` JSON field. Standard conventions (not enforced by schema):
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `priority` | `"low" \| "medium" \| "high" \| "critical"` | Work priority |
+| `labels` | `string[]` | Free-form tags for filtering |
+| `estimate` | `number` | Story points or time estimate |
+| `due_date` | ISO 8601 string | Target completion |
+| `epic` | `string` | Parent epic identifier |
+
+Agents and UIs can filter, sort, and build views using any metadata key. The API supports metadata filter queries.
+
+---
+
+## 6. Data Model
+
+### 6.1 Entity Overview
+
+| Entity | Parent | Description |
+|--------|--------|-------------|
+| **Organization** | - | Top-level tenant. Phase 1: single org, config only. |
+| **Project** | Organization | Named collection of boards and threads. |
+| **Board** | Project | Named view. Displays threads in columns. |
+| **Column** | Board | Logical grouping defined by a filter rule. |
+| **Thread** | Project (+ optionally pinned to a Board Column) | Unit of work and agent session. |
+| **Message** | Thread | One conversation turn. |
+| **Run** | Thread | One Bob invocation. |
+| **Bob** | Organization | Registered agent connector instance. |
+
+### 6.2 SQL Schema
 
 ```sql
+-- Projects
+CREATE TABLE IF NOT EXISTS projects (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL DEFAULT '',
+  metadata    TEXT NOT NULL DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Boards (named views within a project)
+CREATE TABLE IF NOT EXISTS boards (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  metadata    TEXT NOT NULL DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Columns (logical groupings on a board, defined by a filter rule)
+CREATE TABLE IF NOT EXISTS columns (
+  id          TEXT PRIMARY KEY,
+  board_id    TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  position    INTEGER NOT NULL DEFAULT 0,
+  filter_rule TEXT NOT NULL DEFAULT '{}', -- JSON: { status?, labels?, bob_id? }
+  metadata    TEXT NOT NULL DEFAULT '{}',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Registered Bob connectors (agent harness instances)
 CREATE TABLE IF NOT EXISTS bobs (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
   harness     TEXT NOT NULL,              -- copilot-bridge | claude-code | subprocess | a2a | acp
-  config      TEXT NOT NULL DEFAULT '{}', -- JSON connector config
+  config      TEXT NOT NULL DEFAULT '{}', -- JSON connector config (harness-specific)
   status      TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
+  metadata    TEXT NOT NULL DEFAULT '{}',
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Threads: the unit of work
+-- Threads: unit of work and persistent agent session
 CREATE TABLE IF NOT EXISTS threads (
   id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title       TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'idea', -- idea | refining | ready | in_progress | blocked | done | archived
   bob_id      TEXT REFERENCES bobs(id) ON DELETE SET NULL,
-  metadata    TEXT NOT NULL DEFAULT '{}',   -- JSON freeform metadata
+  metadata    TEXT NOT NULL DEFAULT '{}',
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -99,58 +274,191 @@ CREATE TABLE IF NOT EXISTS messages (
   thread_id   TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
   run_id      TEXT REFERENCES runs(id) ON DELETE SET NULL,
   author      TEXT NOT NULL,              -- human | bob | system
-  author_id   TEXT,                       -- bob_id if author=bob, user id if human
+  author_id   TEXT,
   content     TEXT NOT NULL,
+  metadata    TEXT NOT NULL DEFAULT '{}',
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Runs: one invocation of a Bob against a Thread
 CREATE TABLE IF NOT EXISTS runs (
-  id          TEXT PRIMARY KEY,
-  thread_id   TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-  bob_id      TEXT NOT NULL REFERENCES bobs(id) ON DELETE RESTRICT,
-  status      TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
-  input       TEXT NOT NULL DEFAULT '',   -- the prompt/input sent to the Bob
-  output      TEXT,                       -- the result returned by the Bob
-  error       TEXT,                       -- error message if status = failed
-  started_at  TEXT,
+  id           TEXT PRIMARY KEY,
+  thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  bob_id       TEXT NOT NULL REFERENCES bobs(id) ON DELETE RESTRICT,
+  status       TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
+  input        TEXT NOT NULL DEFAULT '',
+  output       TEXT,
+  error        TEXT,
+  started_at   TEXT,
   completed_at TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  metadata     TEXT NOT NULL DEFAULT '{}',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_boards_project    ON boards(project_id);
+CREATE INDEX IF NOT EXISTS idx_columns_board     ON columns(board_id);
+CREATE INDEX IF NOT EXISTS idx_threads_project   ON threads(project_id);
+CREATE INDEX IF NOT EXISTS idx_threads_status    ON threads(status);
+CREATE INDEX IF NOT EXISTS idx_threads_bob       ON threads(bob_id);
+CREATE INDEX IF NOT EXISTS idx_messages_thread   ON messages(thread_id);
+CREATE INDEX IF NOT EXISTS idx_messages_run      ON messages(run_id);
+CREATE INDEX IF NOT EXISTS idx_runs_thread       ON runs(thread_id);
+CREATE INDEX IF NOT EXISTS idx_runs_status       ON runs(status);
 ```
 
-### 3.3 Thread Status Flow
+### 6.3 Thread Status Flow
 
+```mermaid
+stateDiagram-v2
+    [*] --> idea
+    idea --> refining
+    idea --> blocked
+    refining --> ready
+    ready --> in_progress
+    ready --> blocked
+    in_progress --> done
+    in_progress --> blocked
+    blocked --> archived
+    done --> archived
 ```
-idea --> refining --> ready --> in_progress --> done
-  |                    |            |
-  |                    v            v
-  +--------------> blocked ------> archived
-```
 
-- **idea**: captured but not yet specified
-- **refining**: being discussed and detailed (may involve a Bob in spec-writing mode)
-- **ready**: fully specified and ready to be worked on
-- **in_progress**: a Bob has been dispatched and a Run is active
-- **blocked**: work cannot continue without external input
-- **done**: work is complete and accepted
-- **archived**: will not be worked on
+### 6.4 Run Status Flow
 
-### 3.4 Run Status Flow
-
-```
-created --> queued --> running --> completed
-                |          |
-                v          v
-            cancelled    failed
+```mermaid
+stateDiagram-v2
+    [*] --> created
+    created --> queued
+    queued --> running
+    queued --> cancelled
+    running --> completed
+    running --> failed
 ```
 
 ---
 
-## 4. Connector Interface
+## 7. Real-Time and Bidirectional Data
 
-Every Bob connector implements `IBobConnector`. The interface is intentionally thin: SCUT's job is to route and track, not to dictate how the harness works internally.
+### Model
+
+SCUT uses **Server-Sent Events (SSE)** for server-to-client push (run status updates, new messages, thread status changes). SSE is sufficient for Phase 1 and 2 because the primary real-time flow is one-way: the server notifying the UI of agent results.
+
+For bidirectional needs (human typing a message while a run is in progress, collaborative editing), **WebSockets** are the Phase 3 upgrade path. The API design does not prevent this - SSE and WebSocket endpoints are additive.
+
+### Event Streams
+
+| Endpoint | Scope | Events emitted |
+|----------|-------|----------------|
+| `GET /api/threads/:id/events` | Single thread | `message`, `run`, `thread` |
+| `GET /api/projects/:id/events` | Whole project | `thread_created`, `thread_updated`, `run_updated` |
+
+### Bidirectional Flow: Thread as Agent Session
+
+```mermaid
+sequenceDiagram
+    participant H as Human (UI or API client)
+    participant S as SCUT Server
+    participant B as Bob (via IReplicantConnector)
+
+    H->>S: POST /api/threads/:id/messages (author=human)
+    S->>S: Create Message record
+    S->>S: Create Run record (status=created)
+    S->>B: connector.dispatch(run, thread)
+    S-->>H: 201 { message, run }
+    B-->>S: POST /api/internal/runs/:id/result
+    S->>S: Update Run (status=completed, output=...)
+    S->>S: Create Message (author=bob, content=output)
+    S-->>H: SSE event: run updated
+    S-->>H: SSE event: new message
+```
+
+The same flow works for an agent client: the agent POSTs a message to the API just like the human UI does.
+
+---
+
+
+---
+
+## 8. Database Adapter Interface
+
+SCUT's database layer is accessed exclusively through typed repository interfaces. Route handlers call repository methods; they never touch SQL or a DB client directly. This is the seam that makes storage engines swappable.
+
+### 8.1 Interface Pattern
+
+Each entity group has its own repository interface. All methods are async (return `Promise<T>`), even in the Phase 1 SQLite implementation, so the interface works uniformly when Postgres (inherently async) is introduced.
+
+```typescript
+// Minimal example - each entity follows this shape
+export interface IThreadRepository {
+  findById(id: string): Promise<Thread | null>;
+  findByProject(projectId: string, filters?: ThreadFilters): Promise<Thread[]>;
+  create(input: CreateThreadInput): Promise<Thread>;
+  update(id: string, input: UpdateThreadInput): Promise<Thread>;
+  archive(id: string): Promise<void>;
+}
+
+// Root interface: one instance, all repositories
+export interface IRepository {
+  projects:  IProjectRepository;
+  boards:    IBoardRepository;
+  columns:   IColumnRepository;
+  bobs:      IBobRepository;
+  threads:   IThreadRepository;
+  messages:  IMessageRepository;
+  runs:      IRunRepository;
+}
+```
+
+The server receives a single `IRepository` instance at startup and passes it to all route handlers via Fastify's dependency injection (decorated on the `fastify` instance).
+
+### 8.2 Implementations
+
+| Adapter | Driver | Phase | Notes |
+|---------|--------|-------|-------|
+| `SQLiteRepository` | better-sqlite3 (sync, wrapped in promises) | 1 | Default. File-based. Zero config. |
+| `PostgresRepository` | `pg` or `postgres` | Future | For multi-user or hosted deployments. |
+
+### 8.3 Directory Layout
+
+```
+packages/server/src/db/
+  interfaces/
+    IRepository.ts          - root interface and all sub-interfaces
+    types.ts                - shared input/filter/output types
+  adapters/
+    sqlite/
+      index.ts              - SQLiteRepository implements IRepository
+      projects.ts
+      boards.ts
+      columns.ts
+      bobs.ts
+      threads.ts
+      messages.ts
+      runs.ts
+      schema.sql            - CREATE TABLE statements
+      migrate.ts            - idempotent migration runner
+    postgres/
+      index.ts              - PostgresRepository (Phase 3+)
+  index.ts                  - factory: createRepository(driver) -> IRepository
+```
+
+### 8.4 Driver Selection
+
+```
+DATABASE_DRIVER=sqlite    # default
+DATABASE_PATH=./scut.db
+
+# For postgres (future):
+DATABASE_DRIVER=postgres
+DATABASE_URL=postgresql://user:pass@host:5432/scut
+```
+
+---
+
+## 9. Connector Interface
+
+Every Bob connector implements `IReplicantConnector`. The interface is intentionally thin: SCUT's job is to route and track, not to dictate how the harness works internally.
 
 ```typescript
 export type BobStatus = {
@@ -161,6 +469,7 @@ export type BobStatus = {
 
 export type Thread = {
   id: string;
+  projectId: string;
   title: string;
   description: string;
   status: string;
@@ -184,7 +493,7 @@ export type Run = {
   updatedAt: string;
 };
 
-export interface IBobConnector {
+export interface IReplicantConnector {
   /**
    * Dispatch a Run to the Bob. Fire-and-forget.
    * Resolves when the run has been accepted (queued or started), not when complete.
@@ -205,126 +514,91 @@ export interface IBobConnector {
 }
 ```
 
-### 4.1 Connector Contract Notes
+### 9.1 Connector Contract Notes
 
-- `dispatch` is fire-and-forget. SCUT creates the Run record before calling dispatch. The connector may update the Run status to `queued` or `running` synchronously (via a direct DB write or an internal API call), but the result arrives later via the callback.
+- `dispatch` is fire-and-forget. SCUT creates the Run record before calling dispatch. The connector may update the Run status to `queued` or `running` synchronously, but the result arrives later via the callback.
 - `cancel` is best-effort. Some harnesses may not support mid-run cancellation. Connectors should set Run status to `cancelled` and resolve without throwing if cancellation is not possible.
 - `status` is called periodically by SCUT to update the Bob's availability in the `bobs` table. It should be cheap and non-blocking.
 
 ---
 
-## 5. API Surface
+## 10. API Surface
 
-All endpoints return JSON. Error responses use the shape `{ error: string, code?: string }`.
+All endpoints return JSON. Error responses use `{ error: string, code?: string }`. The full OpenAPI 3.1 spec is served at `/api/docs` and committed to `docs/api/openapi.yaml`.
 
-### 5.1 Threads
+### 10.1 Projects
 
-#### `GET /api/threads`
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects` | List all projects |
+| `POST` | `/api/projects` | Create a project |
+| `GET` | `/api/projects/:id` | Get project by ID |
+| `PATCH` | `/api/projects/:id` | Update project |
+| `DELETE` | `/api/projects/:id` | Archive project |
+| `GET` | `/api/projects/:id/events` | SSE stream for whole project |
 
-List all threads. Supports query params: `status` (filter by status), `bobId` (filter by assigned Bob).
+### 10.2 Boards
 
-Response: `Thread[]`
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/:id/boards` | List boards in project |
+| `POST` | `/api/projects/:id/boards` | Create board |
+| `GET` | `/api/boards/:id` | Get board by ID (with columns) |
+| `PATCH` | `/api/boards/:id` | Update board |
+| `DELETE` | `/api/boards/:id` | Delete board |
 
-#### `POST /api/threads`
+### 10.3 Columns
 
-Create a new thread.
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/boards/:id/columns` | List columns on a board |
+| `POST` | `/api/boards/:id/columns` | Create column |
+| `PATCH` | `/api/columns/:id` | Update column (name, position, filter) |
+| `DELETE` | `/api/columns/:id` | Delete column |
 
-Request body:
-```json
-{
-  "title": "string (required)",
-  "description": "string (optional)",
-  "bobId": "string (optional)",
-  "metadata": "object (optional)"
-}
-```
+### 10.4 Threads
 
-Response: `Thread` (201 Created)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/:id/threads` | List threads in project (filterable) |
+| `POST` | `/api/projects/:id/threads` | Create thread |
+| `GET` | `/api/threads/:id` | Get thread (with messages, latest run) |
+| `PATCH` | `/api/threads/:id` | Update thread (status, bobId, metadata, etc.) |
+| `DELETE` | `/api/threads/:id` | Archive thread |
+| `GET` | `/api/threads/:id/events` | SSE stream for single thread |
 
-#### `GET /api/threads/:id`
+Query params for `GET /api/projects/:id/threads`: `status`, `bobId`, `label`, `metadata.*` (arbitrary metadata filter).
 
-Get a single thread by ID, including its messages and most recent run.
+### 10.5 Messages
 
-Response:
-```json
-{
-  "thread": Thread,
-  "messages": Message[],
-  "latestRun": Run | null
-}
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/threads/:id/messages` | List messages on a thread |
+| `POST` | `/api/threads/:id/messages` | Add message (triggers Run if Bob assigned) |
 
-#### `PATCH /api/threads/:id`
+### 10.6 Runs
 
-Update a thread. Accepts any subset of: `title`, `description`, `status`, `bobId`, `metadata`.
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/threads/:id/runs` | List runs for a thread |
+| `POST` | `/api/threads/:id/runs` | Manually dispatch a run |
+| `DELETE` | `/api/runs/:id` | Cancel a run |
 
-Response: `Thread`
+### 10.7 Bobs
 
-#### `DELETE /api/threads/:id`
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/bobs` | List all Bobs with status |
+| `POST` | `/api/bobs` | Register a Bob |
+| `GET` | `/api/bobs/:id` | Get Bob by ID |
+| `PATCH` | `/api/bobs/:id` | Update Bob config |
+| `DELETE` | `/api/bobs/:id` | Deregister Bob |
 
-Archive a thread (sets status to `archived`). Does not delete the record.
-
-Response: `{ ok: true }`
-
-### 5.2 Messages
-
-#### `POST /api/threads/:id/messages`
-
-Add a message to a thread. If a Bob is assigned to the thread and the message is from a human, SCUT automatically creates and dispatches a new Run.
-
-Request body:
-```json
-{
-  "author": "human | system",
-  "authorId": "string (optional)",
-  "content": "string (required)"
-}
-```
-
-Response: `{ message: Message, run: Run | null }` (201 Created)
-
-### 5.3 Runs
-
-#### `GET /api/threads/:id/runs`
-
-List all runs for a thread, ordered by `created_at` descending.
-
-Response: `Run[]`
-
-### 5.4 Bobs
-
-#### `GET /api/bobs`
-
-List all registered Bobs with their current status.
-
-Response: `Bob[]`
-
-### 5.5 Real-Time Events
-
-#### `GET /api/threads/:id/events`
-
-Server-Sent Events stream for a thread. Emits events when:
-- A message is added to the thread
-- A run status changes
-- The thread status changes
-
-Event format:
-```
-event: message
-data: { "type": "message", "payload": Message }
-
-event: run
-data: { "type": "run", "payload": Run }
-
-event: thread
-data: { "type": "thread", "payload": Thread }
-```
-
-### 5.6 Internal (Connector Callback)
+### 10.8 Internal (Connector Callback)
 
 #### `POST /api/internal/runs/:id/result`
 
-Used by Bob connectors to post results back to SCUT after a Run completes. Not intended for direct human use.
+Used by connectors to post results back to SCUT after a Run completes.
 
 Request body:
 ```json
@@ -335,19 +609,13 @@ Request body:
 }
 ```
 
-Response: `{ ok: true }`
-
-Side effects:
-- Updates the Run record (status, output/error, completed_at)
-- Creates a Message authored by `bob` with the output content (if completed)
-- Emits SSE events on the thread's event stream
-- If status is `completed`, considers updating Thread status to `done` (configurable)
+Side effects: updates Run, creates Message (author=bob), emits SSE events.
 
 ---
 
-## 6. Connector Implementations (Planned)
+## 11. Connector Implementations (Planned)
 
-### `CopilotBridgeBob`
+### `CopilotBridgeConnector`
 
 Wraps the copilot-bridge HTTP channel adapter. Translates a Run into a copilot-bridge channel invocation. Results come back via the bridge's existing webhook/callback mechanism, forwarded to SCUT's internal result endpoint.
 
@@ -355,7 +623,7 @@ Wraps the copilot-bridge HTTP channel adapter. Translates a Run into a copilot-b
 - Transport: HTTP (copilot-bridge's own API)
 - Status: Phase 1 target
 
-### `ClaudeCodeBob`
+### `ClaudeCodeConnector`
 
 Drives the `claude` CLI via subprocess. Launches `claude` with the Run input as a prompt, captures stdout as the result, and posts to the result callback. Supports cancellation via process kill.
 
@@ -363,7 +631,7 @@ Drives the `claude` CLI via subprocess. Launches `claude` with the Run input as 
 - Transport: subprocess (stdin/stdout)
 - Status: Phase 3 target
 
-### `SubprocessBob`
+### `SubprocessConnector`
 
 Generic subprocess connector. Launches a configurable command with the Run input on stdin, reads the result from stdout. Enables any CLI-based agent to be connected with minimal configuration.
 
@@ -372,7 +640,7 @@ Generic subprocess connector. Launches a configurable command with the Run input
 - Config: `{ command: string, args: string[] }`
 - Status: Phase 3 target
 
-### `A2ABob`
+### `A2AConnector`
 
 Connects to a remote agent via the Google A2A (Agent-to-Agent) protocol. Translates a Run into an A2A task submission. Polls or subscribes to A2A task status updates and posts results back to SCUT's callback endpoint.
 
@@ -381,7 +649,7 @@ Connects to a remote agent via the Google A2A (Agent-to-Agent) protocol. Transla
 - Config: `{ agentCardUrl: string, auth?: object }`
 - Status: Phase 3 target
 
-### `ACPBob`
+### `ACPConnector`
 
 Connects to a local agent via the IBM ACP (Agent Communication Protocol). Designed for locally-running agents (local LLMs, edge services).
 
@@ -392,21 +660,22 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 
 ---
 
-## 7. Phase Plan
+## 12. Phase Plan
 
 ### Phase 1 - MVP
 
-**Goal:** A working board where you can create threads, assign a CopilotBridgeBob, and see results.
+**Goal:** A working board where you can create projects, boards, threads, assign a Bob, and see results.
 
 **Deliverables:**
-- Thread / Message / Run / Bob data model fully implemented
-- Fastify API: all endpoints in section 5 (except SSE)
-- SQLite database with migrations
-- `CopilotBridgeBob` connector implementation
-- Basic React board (list threads, create thread, view thread detail)
+- Full data model: Project / Board / Column / Thread / Message / Run / Bob
+- SQLite database with migration runner
+- Fastify API: all endpoints in section 9 (Projects, Boards, Columns, Threads, Messages, Runs, Bobs - excluding SSE)
+- OpenAPI 3.1 spec served at `/api/docs`, committed to `docs/api/openapi.yaml`
+- `CopilotBridgeConnector` as the Phase 1 reference `IReplicantConnector` implementation
+- Basic React SPA (Moot): project list, board view with columns, thread detail, Bobs page
 - Manual Bob registration via API or seed script
 
-**Success criteria:** A human can create a thread in the Moot, assign it to a CopilotBridgeBob, add a message, and see the Bob's result appear in the thread history.
+**Success criteria:** A human can create a project, create a board with columns, create a thread, assign it to a Bob, add a message, and see the Bob's result appear in the thread history.
 
 ### Phase 2 - Real-Time and Run Tracking
 
@@ -425,20 +694,20 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 **Goal:** Connect Claude Code and Codex via subprocess. Connect a remote A2A agent.
 
 **Deliverables:**
-- `SubprocessBob` connector (generic)
-- `ClaudeCodeBob` connector (uses SubprocessBob with claude CLI)
-- `A2ABob` connector
+- `SubprocessConnector` (generic)
+- `ClaudeCodeConnector` (uses SubprocessConnector with claude CLI)
+- `A2AConnector`
 - Moot UI: Bob type selector when assigning a Bob to a thread
 - Run input editing before dispatch
 
-**Success criteria:** A thread can be reassigned from a CopilotBridgeBob to a ClaudeCodeBob mid-conversation, and the new Bob picks up from the thread history.
+**Success criteria:** A thread can be reassigned from a `CopilotBridgeConnector` Bob to a `ClaudeCodeConnector` Bob mid-conversation, and the new Bob picks up from the thread history.
 
 ### Phase 4 - Local-First and Parallel Dispatch
 
 **Goal:** ACP support and multi-Bob parallelism.
 
 **Deliverables:**
-- `ACPBob` connector
+- `ACPConnector`
 - Parallel dispatch: send a Thread to multiple Bobs simultaneously, compare results
 - Thread branching: fork a thread to explore two approaches in parallel
 - Moot UI: parallel run comparison view

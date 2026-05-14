@@ -3,11 +3,12 @@
 ## Table of Contents
 
 1. [Problem Statement](#1-problem-statement)
-2. [Prior Art](#2-prior-art)
-3. [Protocol Landscape](#3-protocol-landscape)
-4. [Reference Implementations](#4-reference-implementations)
-5. [Bobiverse Inspiration](#5-bobiverse-inspiration)
-6. [SCUT Design Decisions](#6-scut-design-decisions)
+2. [Vocabulary](#2-vocabulary)
+3. [Prior Art](#3-prior-art)
+4. [Protocol Landscape](#4-protocol-landscape)
+5. [Reference Implementations](#5-reference-implementations)
+6. [Bobiverse Inspiration](#6-bobiverse-inspiration)
+7. [SCUT Design Decisions](#7-scut-design-decisions)
 
 ---
 
@@ -41,7 +42,27 @@ SCUT does not run inference. It does not wrap a model. It does not replace any a
 
 ---
 
-## 2. Prior Art
+## 2. Vocabulary
+
+| Term | What it is |
+|------|------------|
+| **Bob** | A registered agent connector instance. One row in the `bobs` table. Named after the Bobiverse replicants. |
+| **Thread** | A unit of work and its full conversation history. |
+| **Message** | One message in a Thread - from a human, a Bob, or the system. |
+| **Run** | One invocation of a Bob against a Thread. Tracks status and result. |
+| **Moot** | The React board UI. Where humans see and manage all Threads. |
+| **IReplicantConnector** | The harness-agnostic connector interface every Bob adapter implements. |
+| **CopilotBridgeConnector** | Phase 1 reference implementation of `IReplicantConnector` for copilot-bridge. |
+| **ClaudeCodeConnector** | Phase 3 connector for the `claude` CLI via subprocess. |
+| **SubprocessConnector** | Phase 3 generic connector for any CLI-based agent harness. |
+| **A2AConnector** | Phase 3 connector for remote agents via the Google A2A protocol. |
+| **ACPConnector** | Phase 4 connector for local agents via the IBM ACP protocol. |
+
+The pattern: `Bob` is the entity. `IReplicantConnector` is the interface. Each `*Connector` is one harness adapter.
+
+---
+
+## 3. Prior Art
 
 Three prior projects from `raykao/dark-factory` established the building blocks. Each got something right and something wrong.
 
@@ -58,7 +79,7 @@ Three prior projects from `raykao/dark-factory` established the building blocks.
 - It assumed copilot-bridge is the only backend. The card model has a hard dependency on the bridge's specific invocation interface. Adding a second agent harness would require restructuring the backend.
 - It conflated "the board app" with "the bridge integration." The bridge should be one connector among many.
 
-**SCUT's correction:** The kanban model is preserved and generalized. The agent backend is abstracted behind a `IBobConnector` interface. copilot-bridge becomes `CopilotBridgeBob` - one connector implementation, not the whole system.
+**SCUT's correction:** The kanban model is preserved and generalized. The agent backend is abstracted behind a `IReplicantConnector` interface. copilot-bridge becomes `CopilotBridgeConnector` - one connector implementation, not the whole system.
 
 ### 2.2 inter-agent-task-handoff
 
@@ -94,7 +115,7 @@ Three prior projects from `raykao/dark-factory` established the building blocks.
 
 | Project | Got right | Got wrong | SCUT's correction |
 |---|---|---|---|
-| copilot-bridge-kanban | Card model, kanban UX, Fastify+SQLite stack | Hard-coded bridge backend | `IBobConnector` adapter interface |
+| copilot-bridge-kanban | Card model, kanban UX, Fastify+SQLite stack | Hard-coded bridge backend | `IReplicantConnector` adapter interface |
 | inter-agent-task-handoff | Async fire-and-forget, delegate+check pattern | Bridge-internal scope, no persistence | Run record, persisted state, callback endpoint |
 | work-board | Aggregated board view, communication-surface idea | Mattermost lock-in, view-only | Moot as standalone React app with dispatch capability |
 
@@ -120,7 +141,7 @@ A2A's key design choices:
 - **Streaming:** A2A supports SSE-based streaming for real-time partial results.
 - **Auth:** Designed for cross-organization deployment with OAuth and API key support.
 
-A2A is well suited to `A2ABob`: a SCUT connector that routes a Run to a remote A2A-compatible agent. The connector translates SCUT's Run into an A2A task submission and receives the result via A2A's callback or poll mechanism.
+A2A is well suited to `A2AConnector`: a SCUT connector that routes a Run to a remote A2A-compatible agent. The connector translates SCUT's Run into an A2A task submission and receives the result via A2A's callback or poll mechanism.
 
 **A2A is appropriate when:** the Bob lives in a different organization's infrastructure, when capability negotiation matters, or when the deployment environment is cloud-native.
 
@@ -133,7 +154,7 @@ ACP's key design choices:
 - **Simpler wire format:** REST + JSON without the JSON-LD overhead of A2A.
 - **Agent discovery:** Local service discovery rather than internet-hosted agent directories.
 
-ACP is well suited to `ACPBob`: a SCUT connector for locally-running agent services (a local LLM, an on-premises automation service, an edge device).
+ACP is well suited to `ACPConnector`: a SCUT connector for locally-running agent services (a local LLM, an on-premises automation service, an edge device).
 
 **ACP is appropriate when:** the Bob runs on the same machine or local network, when offline capability matters, or when deployment simplicity is a priority.
 
@@ -145,28 +166,37 @@ SCUT operates at the coordination layer, above MCP. A Bob running inside copilot
 
 ### 3.5 SCUT's Position
 
-```
-+----------------------------------+
-|         Human operator           |
-|         SCUT Moot (UI)           |
-+----------------------------------+
-|         SCUT server              |
-|  Thread / Run / Message / Bob    |
-+----------------------------------+
-|       Connector interface        |
-|  IBobConnector                   |
-+----------+----------+------------+
-           |          |
-    +------+--+  +----+----+  +----+----+
-    |CopilotBob|  | A2ABob  |  | ACPBob  |
-    |subprocess|  | HTTP+A2A|  | HTTP+ACP|
-    +----------+  +---------+  +---------+
-           |          |              |
-      copilot-   remote A2A     local ACP
-      bridge     agent         agent
+```mermaid
+flowchart TB
+    HO["Human Operator"]
+
+    subgraph moot["SCUT Moot (UI)"]
+    end
+
+    subgraph scut["SCUT Server"]
+        data["Thread / Run / Message / Bob"]
+        irc["IReplicantConnector"]
+    end
+
+    CBC["CopilotBridgeConnector\n(copilot-bridge HTTP)"]
+    A2AC["A2AConnector\n(HTTP + A2A)"]
+    ACPC["ACPConnector\n(HTTP + ACP)"]
+
+    CB["copilot-bridge"]
+    RA["remote A2A agent"]
+    LA["local ACP agent"]
+
+    HO --> moot
+    moot --> scut
+    irc --> CBC
+    irc --> A2AC
+    irc --> ACPC
+    CBC --> CB
+    A2AC --> RA
+    ACPC --> LA
 ```
 
-A2A and ACP are transport options behind SCUT's connector interface. A team can run `CopilotBridgeBob` for local Copilot work, `A2ABob` for a cloud-hosted specialist agent, and `ACPBob` for a local LLM - all on the same SCUT board, tracked in the same Thread history.
+A2A and ACP are transport options behind SCUT's connector interface. A team can run `CopilotBridgeConnector` for local Copilot work, `A2AConnector` for a cloud-hosted specialist agent, and `ACPConnector` for a local LLM - all on the same SCUT board, tracked in the same Thread history.
 
 The connector choice is per-Bob, not per-system. SCUT does not pick a protocol. Each Bob connector picks the protocol appropriate for the harness it wraps.
 
@@ -185,13 +215,13 @@ Hermes is an open-source multi-agent framework that demonstrates a three-tier de
 Hermes also publishes an ACP adapter, making it ACP-accessible from outside. A Hermes agent can receive a task via ACP, execute it using its internal loop, and return the result via ACP.
 
 **What SCUT learns from Hermes:**
-- The interface/implementation separation is correct and SCUT uses the same pattern (`IBobConnector` as the interface, `CopilotBridgeBob` etc. as implementations).
-- ACP as an integration surface validates SCUT's `ACPBob` connector plan.
+- The interface/implementation separation is correct and SCUT uses the same pattern (`IReplicantConnector` as the interface, `CopilotBridgeConnector` etc. as implementations).
+- ACP as an integration surface validates SCUT's `ACPConnector` connector plan.
 
 **How SCUT differs from Hermes:**
 - Hermes is an agent framework. It runs the reasoning loop. SCUT is not. SCUT does not reason, plan, or execute. It routes and tracks.
 - Hermes does not have a board/coordination view. It is a framework for building agents, not for coordinating between them.
-- SCUT treats a Hermes instance as a potential Bob. SCUT dispatches work to it via `ACPBob`. What Hermes does internally is opaque to SCUT.
+- SCUT treats a Hermes instance as a potential Bob. SCUT dispatches work to it via `ACPConnector`. What Hermes does internally is opaque to SCUT.
 
 ### 4.2 The Coordination Plane Concept
 
@@ -243,7 +273,7 @@ Using Bobiverse vocabulary is a deliberate design choice with a practical effect
 | Decision | Choice | Rationale |
 |---|---|---|
 | State ownership | SCUT owns Thread, Run, Message, Bob records | Agent harnesses are stateless or ephemeral. The coordination plane must own persistence. The harness should not be the system of record for task state. |
-| Connector interface | `IBobConnector` thin adapter per harness type | Isolates harness-specific logic. Adding a new Bob type requires only a new class implementing the interface, not changes to the core. |
+| Connector interface | `IReplicantConnector` thin adapter per harness type | Isolates harness-specific logic. Adding a new connector requires only a new class implementing the interface, not changes to the core. |
 | Protocol choice | Per-connector (A2A / ACP / HTTP callback / subprocess) | No single protocol fits all deployment contexts. Cloud agents, local agents, and subprocess agents have different operational requirements. Forcing one protocol would exclude valid use cases. |
 | Vocabulary | Bobiverse-aligned (Bob, Thread, Moot, Run) | Avoids term collision with existing AI frameworks. Precise within the domain. Signals the design model to people familiar with the source material. |
 | Runtime | TypeScript monorepo (server + UI share types) | TypeScript gives end-to-end type safety across the API boundary. npm workspaces keeps the repo manageable without requiring a separate build tool (Nx, Turborepo) at MVP. |
