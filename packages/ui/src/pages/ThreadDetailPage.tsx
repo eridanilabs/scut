@@ -5,43 +5,15 @@ import { useThreadsStore } from '@/stores/threads';
 import { useBobsStore } from '@/stores/bobs';
 import { ThreadStatusBadge } from '@/components/thread/ThreadStatusBadge';
 import { RunStatusBadge } from '@/components/run/RunStatusBadge';
-import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
 import { BobSelector } from '@/components/bob/BobSelector';
+import { ThreadStatusSelector } from '@/components/thread/ThreadStatusSelector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { ErrorState } from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
-import type { ThreadStatus } from '@/api/types';
-
-const THREAD_STATUSES: ThreadStatus[] = [
-  'idea',
-  'refining',
-  'ready',
-  'in_progress',
-  'blocked',
-  'done',
-  'archived',
-];
-
-const STATUS_LABELS: Record<ThreadStatus, string> = {
-  idea: 'Idea',
-  refining: 'Refining',
-  ready: 'Ready',
-  in_progress: 'In Progress',
-  blocked: 'Blocked',
-  done: 'Done',
-  archived: 'Archived',
-};
 
 export function ThreadDetailPage() {
   const { threadId } = useParams<{ threadId: string }>();
@@ -110,23 +82,10 @@ export function ThreadDetailPage() {
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Status</label>
-            <Select
+            <ThreadStatusSelector
               value={selected.status}
-              onValueChange={(val) =>
-                threadId && update(threadId, { status: val as ThreadStatus })
-              }
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {THREAD_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABELS[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(val) => threadId && update(threadId, { status: val })}
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
