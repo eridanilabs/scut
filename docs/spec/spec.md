@@ -3,18 +3,39 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [Architecture Diagram](#2-architecture-diagram)
-3. [Data Model](#3-data-model)
-4. [Connector Interface](#4-connector-interface)
-5. [API Surface](#5-api-surface)
-6. [Connector Implementations (Planned)](#6-connector-implementations-planned)
-7. [Phase Plan](#7-phase-plan)
+2. [Vocabulary](#2-vocabulary)
+3. [Architecture Diagram](#3-architecture-diagram)
+4. [Data Model](#4-data-model)
+5. [Connector Interface](#5-connector-interface)
+6. [API Surface](#6-api-surface)
+7. [Connector Implementations (Planned)](#7-connector-implementations-planned)
+8. [Phase Plan](#8-phase-plan)
 
 ---
 
 ## 1. Executive Summary
 
 SCUT (Structured Coordination Utility for Tasks) is an agnostic multi-agent coordination plane: a kanban-style task routing and tracking layer that connects to any AI agent harness (GitHub Copilot CLI, Claude Code, OpenAI Codex, Gemini, and others). SCUT maintains a persistent record of work (Threads), tracks each agent invocation (Runs), stores conversation history (Messages), and provides a board view (the Moot) where humans can assign, monitor, and review work across all registered agents (Bobs). SCUT is not an agent framework, does not run language models, and does not replace copilot-bridge or any other harness - it is the coordination plane that sits above them.
+
+---
+
+## 2. Vocabulary
+
+| Term | What it is |
+|------|------------|
+| **Bob** | A registered agent connector instance. One row in the `bobs` table. Named after the Bobiverse replicants. |
+| **Thread** | A unit of work and its full conversation history. |
+| **Message** | One message in a Thread - from a human, a Bob, or the system. |
+| **Run** | One invocation of a Bob against a Thread. Tracks status and result. |
+| **Moot** | The React board UI. Where humans see and manage all Threads. |
+| **IReplicantConnector** | The harness-agnostic connector interface every Bob adapter implements. |
+| **CopilotBridgeConnector** | Phase 1 reference implementation of `IReplicantConnector` for copilot-bridge. |
+| **ClaudeCodeConnector** | Phase 3 connector for the `claude` CLI via subprocess. |
+| **SubprocessConnector** | Phase 3 generic connector for any CLI-based agent harness. |
+| **A2AConnector** | Phase 3 connector for remote agents via the Google A2A protocol. |
+| **ACPConnector** | Phase 4 connector for local agents via the IBM ACP protocol. |
+
+The pattern: `Bob` is the entity. `IReplicantConnector` is the interface. Each `*Connector` is one harness adapter.
 
 ---
 

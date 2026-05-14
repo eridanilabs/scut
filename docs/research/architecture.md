@@ -3,11 +3,12 @@
 ## Table of Contents
 
 1. [Problem Statement](#1-problem-statement)
-2. [Prior Art](#2-prior-art)
-3. [Protocol Landscape](#3-protocol-landscape)
-4. [Reference Implementations](#4-reference-implementations)
-5. [Bobiverse Inspiration](#5-bobiverse-inspiration)
-6. [SCUT Design Decisions](#6-scut-design-decisions)
+2. [Vocabulary](#2-vocabulary)
+3. [Prior Art](#3-prior-art)
+4. [Protocol Landscape](#4-protocol-landscape)
+5. [Reference Implementations](#5-reference-implementations)
+6. [Bobiverse Inspiration](#6-bobiverse-inspiration)
+7. [SCUT Design Decisions](#7-scut-design-decisions)
 
 ---
 
@@ -41,7 +42,27 @@ SCUT does not run inference. It does not wrap a model. It does not replace any a
 
 ---
 
-## 2. Prior Art
+## 2. Vocabulary
+
+| Term | What it is |
+|------|------------|
+| **Bob** | A registered agent connector instance. One row in the `bobs` table. Named after the Bobiverse replicants. |
+| **Thread** | A unit of work and its full conversation history. |
+| **Message** | One message in a Thread - from a human, a Bob, or the system. |
+| **Run** | One invocation of a Bob against a Thread. Tracks status and result. |
+| **Moot** | The React board UI. Where humans see and manage all Threads. |
+| **IReplicantConnector** | The harness-agnostic connector interface every Bob adapter implements. |
+| **CopilotBridgeConnector** | Phase 1 reference implementation of `IReplicantConnector` for copilot-bridge. |
+| **ClaudeCodeConnector** | Phase 3 connector for the `claude` CLI via subprocess. |
+| **SubprocessConnector** | Phase 3 generic connector for any CLI-based agent harness. |
+| **A2AConnector** | Phase 3 connector for remote agents via the Google A2A protocol. |
+| **ACPConnector** | Phase 4 connector for local agents via the IBM ACP protocol. |
+
+The pattern: `Bob` is the entity. `IReplicantConnector` is the interface. Each `*Connector` is one harness adapter.
+
+---
+
+## 3. Prior Art
 
 Three prior projects from `raykao/dark-factory` established the building blocks. Each got something right and something wrong.
 
