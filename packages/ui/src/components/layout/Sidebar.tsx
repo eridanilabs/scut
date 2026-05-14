@@ -23,6 +23,22 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
   const navigate = useNavigate();
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
+  const toggleBtn = (
+    <Tooltip>
+      <TooltipTrigger
+        className="size-11 rounded-lg flex items-center justify-center transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        onClick={toggleSidebar}
+      >
+        {collapsed
+          ? <PanelLeftOpen className="size-4 shrink-0" />
+          : <PanelLeftClose className="size-4 shrink-0" />
+        }
+      </TooltipTrigger>
+      <TooltipContent side="right">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</TooltipContent>
+    </Tooltip>
+  );
+
   return (
     <div
       className={cn(
@@ -32,46 +48,31 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
       )}
     >
       {/* Logo row */}
-      <div className={cn('flex items-center py-3 gap-2', collapsed ? 'justify-center px-0' : 'px-3')}>
+      <div className={cn('flex items-center py-3', collapsed ? 'justify-center' : 'px-3')}>
         <Link
           to="/"
           onClick={onNavigate}
-          className={cn(
-            'flex items-center gap-2.5 font-semibold tracking-tight min-w-0',
-            collapsed ? 'flex-none' : 'flex-1',
-          )}
+          className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"
           aria-label="Home"
         >
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-            <Layers className="size-4" />
-          </div>
-          <div
-            className={cn(
-              'min-w-0 transition-[opacity,width] duration-200',
-              collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
-            )}
-          >
-            <p className="text-sm text-muted-foreground whitespace-nowrap">Workspace</p>
-            <p className="truncate text-base">Scut</p>
-          </div>
+          <Layers className="size-4" />
         </Link>
-        {!collapsed && (
-          <button
-            type="button"
-            aria-label="Collapse sidebar"
-            onClick={toggleSidebar}
-            className="shrink-0 flex size-8 items-center justify-center rounded-lg transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <PanelLeftClose className="size-4 shrink-0" />
-          </button>
-        )}
+        <div
+          className={cn(
+            'ml-2.5 min-w-0 transition-[opacity,max-width] duration-200 overflow-hidden',
+            collapsed ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[120px]',
+          )}
+        >
+          <p className="text-sm text-muted-foreground whitespace-nowrap">Workspace</p>
+          <p className="truncate text-base font-semibold tracking-tight">Scut</p>
+        </div>
       </div>
 
       <Separator className={collapsed ? 'w-8' : 'w-full'} />
 
       {/* Nav items */}
       <ScrollArea className="flex min-h-0 flex-1 flex-col w-full">
-        <div className={cn('py-3 flex flex-col', collapsed ? 'items-center gap-1 px-0' : 'space-y-0.5 px-2')}>
+        <div className={cn('py-3 flex flex-col', collapsed ? 'items-center gap-1' : 'space-y-0.5 px-2')}>
           {primaryNav.map(({ icon: Icon, label, href }) => {
             const active = isPathActive(location.pathname, href);
             const itemClass = cn(
@@ -103,19 +104,10 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         </div>
       </ScrollArea>
 
-      {/* Expand button (collapsed mode only) */}
-      {collapsed && (
-        <Tooltip>
-          <TooltipTrigger
-            className="size-11 mb-2 rounded-lg flex items-center justify-center transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            aria-label="Expand sidebar"
-            onClick={toggleSidebar}
-          >
-            <PanelLeftOpen className="size-4 shrink-0" />
-          </TooltipTrigger>
-          <TooltipContent side="right">Expand sidebar</TooltipContent>
-        </Tooltip>
-      )}
+      {/* Toggle button - always at bottom, same position in both states */}
+      <div className={cn('py-2 flex', collapsed ? 'justify-center' : 'px-2')}>
+        {toggleBtn}
+      </div>
     </div>
   );
 }
