@@ -18,6 +18,7 @@ export const threadsApi = {
     project_id: string;
     title: string;
     description: string;
+    bob_id?: string | null;
   }): Promise<Thread> {
     return mockFetch(() => createMockThread(input));
   },

@@ -14,7 +14,7 @@ interface ThreadsState {
   error: string | null;
   fetchByProject(projectId: string, filters?: { status?: string; bob_id?: string }): Promise<void>;
   fetchDetail(threadId: string): Promise<void>;
-  create(input: { project_id: string; title: string; description: string }): Promise<Thread>;
+  create(input: { project_id: string; title: string; description: string; bob_id?: string | null }): Promise<Thread>;
   update(id: string, patch: { status?: string; bob_id?: string | null }): Promise<void>;
   sendMessage(threadId: string, content: string): Promise<void>;
 }

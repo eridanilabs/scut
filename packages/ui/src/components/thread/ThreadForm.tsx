@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { threadsApi } from '@/api/threads';
+import { useBobsStore } from '@/stores/bobs';
+import { BobSelector } from '@/components/bob/BobSelector';
 import type { Thread } from '@/api/types';
 
 interface ThreadFormProps {
@@ -25,6 +27,12 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [bobId, setBobId] = useState<string | null>(null);
+  const { bobs, fetch: fetchBobs } = useBobsStore();
+
+  useEffect(() => {
+    fetchBobs();
+  }, [fetchBobs]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +43,12 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
         project_id: projectId,
         title: title.trim(),
         description: description.trim(),
+        bob_id: bobId,
       });
       onCreated(thread);
       setTitle('');
       setDescription('');
+      setBobId(null);
       onOpenChange(false);
     } catch (err) {
       toast.error('Failed to create thread');
@@ -75,6 +85,10 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
               placeholder="Optional description"
               rows={3}
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="thread-bob">Assigned Bob</Label>
+            <BobSelector value={bobId} onChange={setBobId} bobs={bobs} />
           </div>
           <DialogFooter>
             <Button

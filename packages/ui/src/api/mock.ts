@@ -579,6 +579,7 @@ export function createMockThread(input: {
   project_id: string;
   title: string;
   description: string;
+  bob_id?: string | null;
 }): Thread {
   const now = new Date().toISOString();
   const thread: Thread = {
@@ -587,7 +588,7 @@ export function createMockThread(input: {
     title: input.title,
     description: input.description,
     status: 'idea',
-    bob_id: null,
+    bob_id: input.bob_id ?? null,
     metadata: {},
     created_at: now,
     updated_at: now,
