@@ -1,0 +1,255 @@
+import { useEffect, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Send } from 'lucide-react';
+import { useThreadsStore } from '@/stores/threads';
+import { useBobsStore } from '@/stores/bobs';
+import { ThreadStatusBadge } from '@/components/thread/ThreadStatusBadge';
+import { RunStatusBadge } from '@/components/run/RunStatusBadge';
+import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { ErrorState } from '@/components/ErrorState';
+import { cn } from '@/lib/utils';
+import type { ThreadStatus } from '@/api/types';
+
+const THREAD_STATUSES: ThreadStatus[] = [
+  'idea',
+  'refining',
+  'ready',
+  'in_progress',
+  'blocked',
+  'done',
+  'archived',
+];
+
+const STATUS_LABELS: Record<ThreadStatus, string> = {
+  idea: 'Idea',
+  refining: 'Refining',
+  ready: 'Ready',
+  in_progress: 'In Progress',
+  blocked: 'Blocked',
+  done: 'Done',
+  archived: 'Archived',
+};
+
+export function ThreadDetailPage() {
+  const { threadId } = useParams<{ threadId: string }>();
+  const { selected, messages, runs, loading, sending, error, fetchDetail, update, sendMessage } =
+    useThreadsStore();
+  const { bobs, fetch: fetchBobs } = useBobsStore();
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!threadId) return;
+    fetchDetail(threadId);
+    fetchBobs();
+  }, [threadId, fetchDetail, fetchBobs]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || !threadId || sending) return;
+    const content = input.trim();
+    setInput('');
+    await sendMessage(threadId, content);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSend(e as unknown as React.FormEvent);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !selected) {
+    return <ErrorState title="Thread not found" description={error ?? 'This thread does not exist.'} onRetry={() => threadId && fetchDetail(threadId)} />;
+  }
+
+  const runMap = Object.fromEntries(runs.map((r) => [r.id, r]));
+
+  return (
+    <div className="flex h-full flex-col gap-4 md:flex-row">
+      {/* Left panel - thread info */}
+      <aside className="flex flex-col gap-4 md:w-72 md:flex-shrink-0">
+        <div>
+          <h2 className="text-lg font-semibold leading-snug">{selected.title}</h2>
+          {selected.description && (
+            <p className="mt-1 text-sm text-muted-foreground">{selected.description}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <Select
+              value={selected.status}
+              onValueChange={(val) =>
+                threadId && update(threadId, { status: val as ThreadStatus })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THREAD_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Assigned Bob</label>
+            <Select
+              value={selected.bob_id ?? '__none__'}
+              onValueChange={(val) =>
+                threadId && update(threadId, { bob_id: val === '__none__' ? null : val })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="No bob assigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {bobs.map((bob) => (
+                  <SelectItem key={bob.id} value={bob.id}>
+                    <span className="flex items-center gap-2">
+                      <BobStatusIndicator status={bob.status} />
+                      {bob.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Run history */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-medium text-muted-foreground">Run History</h3>
+          {runs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No runs yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {[...runs].reverse().map((run) => (
+                <div
+                  key={run.id}
+                  className="flex flex-col gap-1 rounded-md border bg-muted/30 p-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <RunStatusBadge status={run.status} />
+                    <span className="text-muted-foreground">
+                      {new Date(run.created_at).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 text-muted-foreground">
+                    {run.input.slice(0, 80)}{run.input.length > 80 ? '...' : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <Separator orientation="vertical" className="hidden md:block" />
+
+      {/* Right panel - messages */}
+      <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+        <ScrollArea className="flex-1 rounded-md border bg-muted/10 p-4">
+          <div className="flex flex-col gap-3">
+            {messages.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No messages yet. Send one to start the thread.
+              </p>
+            ) : (
+              messages.map((msg) => {
+                const run = msg.run_id ? runMap[msg.run_id] : null;
+
+                if (msg.author === 'system') {
+                  return (
+                    <div key={msg.id} className="flex justify-center">
+                      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                        {msg.content}
+                      </span>
+                    </div>
+                  );
+                }
+
+                const isHuman = msg.author === 'human';
+                return (
+                  <div
+                    key={msg.id}
+                    className={cn('flex flex-col gap-1', isHuman ? 'items-end' : 'items-start')}
+                  >
+                    <div
+                      className={cn(
+                        'max-w-[80%] rounded-xl px-4 py-2 text-sm',
+                        isHuman
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground',
+                      )}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {run && <RunStatusBadge status={run.status} />}
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(msg.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        <form onSubmit={handleSend} className="flex gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Send a message... (Ctrl+Enter to send)"
+            rows={2}
+            className="flex-1 resize-none"
+            disabled={sending}
+          />
+          <Button type="submit" size="icon" disabled={sending || !input.trim()} className="self-end">
+            <Send className="h-4 w-4" />
+            <span className="sr-only">Send</span>
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
