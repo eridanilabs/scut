@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { FolderOpen, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProjectsStore } from '@/stores/projects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,13 +63,17 @@ export function ProjectsPage() {
   };
 
   if (error) {
-    return <ErrorState description={error} onRetry={fetch} />;
+    return (
+      <div className="px-6 py-6">
+        <ErrorState description={error} onRetry={fetch} />
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-6 py-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Projects</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Projects</h2>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> New Project
         </Button>
@@ -90,17 +94,20 @@ export function ProjectsPage() {
           {projects.map((project) => (
             <Card
               key={project.id}
-              className="cursor-pointer gap-3 border border-border/70 shadow-sm transition-colors hover:bg-accent/40"
+              className="cursor-pointer gap-3 border border-border/70 bg-card shadow-sm transition-colors hover:bg-accent/40"
               onClick={() => navigate(`/projects/${project.id}`)}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => e.key === 'Enter' && navigate(`/projects/${project.id}`)}
             >
               <CardHeader>
-                <CardTitle className="text-base">{project.name}</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+                  {project.name}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">
+                <p className="line-clamp-2 text-sm text-muted-foreground">
                   {project.description || 'No description.'}
                 </p>
                 <p className="mt-3 text-xs text-muted-foreground">

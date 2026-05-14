@@ -1,42 +1,88 @@
-import { LayoutDashboard, Bot, X, Layers } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { LayoutDashboard, Bot, Layers } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
-interface NavItem {
-  label: string;
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
+const primaryNav = [
+  { label: 'Projects', href: '/', icon: LayoutDashboard },
+  { label: 'Bobs', href: '/bobs', icon: Bot },
+] as const;
+
+function isPathActive(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Projects', to: '/', icon: LayoutDashboard },
-  { label: 'Bobs', to: '/bobs', icon: Bot },
-];
-
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+  onNavigate,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
   return (
-    <nav className="flex flex-col gap-1 p-2">
-      {NAV_ITEMS.map(({ label, to, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
+    <Link
+      to={href}
+      onClick={onNavigate}
+      className={cn(
+        'flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors',
+        active
+          ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+      )}
+    >
+      <Icon className="size-4 shrink-0" />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const location = useLocation();
+
+  return (
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="px-4 py-5">
+        <Link
+          to="/"
           onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-            )
-          }
+          className="flex items-center gap-3 font-semibold tracking-tight"
         >
-          <Icon className="h-4 w-4" />
-          {label}
-        </NavLink>
-      ))}
-    </nav>
+          <div className="flex size-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+            <Layers className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-muted-foreground">Workspace</p>
+            <p className="truncate text-base">Scut</p>
+          </div>
+        </Link>
+      </div>
+
+      <Separator />
+
+      <ScrollArea className="flex min-h-0 flex-1 flex-col">
+        <div className="space-y-1 px-3 py-4">
+          {primaryNav.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              active={isPathActive(location.pathname, item.href)}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -46,34 +92,18 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
-  const navigate = useNavigate();
-
-  const handleNavigate = () => {
-    onMobileClose();
-  };
-
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="hidden w-56 flex-col border-r bg-sidebar md:flex">
-        <div className="flex h-14 items-center border-b px-4 gap-2">
-          <Layers className="h-5 w-5 shrink-0" />
-          <span className="text-lg font-bold tracking-tight">Scut</span>
-        </div>
-        <NavLinks />
+      <aside className="hidden h-screen w-60 shrink-0 border-r border-sidebar-border bg-sidebar md:flex">
+        <SidebarContent />
       </aside>
-
-      {/* Mobile sheet */}
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose()}>
-        <SheetContent side="left" className="w-56 p-0">
-          <div className="flex h-14 items-center border-b px-4 gap-2">
-            <Layers className="h-5 w-5 shrink-0" />
-            <span className="flex-1 text-lg font-bold tracking-tight">Scut</span>
-            <button onClick={onMobileClose} className="rounded p-1 hover:bg-accent">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <NavLinks onNavigate={handleNavigate} />
+        <SheetContent className="w-80 p-0" side="left" showCloseButton={false}>
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation menu</SheetTitle>
+            <SheetDescription>Browse projects and bobs.</SheetDescription>
+          </SheetHeader>
+          <SidebarContent onNavigate={onMobileClose} />
         </SheetContent>
       </Sheet>
     </>

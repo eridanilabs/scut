@@ -77,7 +77,7 @@ export function ThreadDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 px-6 py-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-64 w-full" />
@@ -86,15 +86,19 @@ export function ThreadDetailPage() {
   }
 
   if (error || !selected) {
-    return <ErrorState title="Thread not found" description={error ?? 'This thread does not exist.'} onRetry={() => threadId && fetchDetail(threadId)} />;
+    return (
+      <div className="px-6 py-6">
+        <ErrorState title="Thread not found" description={error ?? 'This thread does not exist.'} onRetry={() => threadId && fetchDetail(threadId)} />
+      </div>
+    );
   }
 
   const runMap = Object.fromEntries(runs.map((r) => [r.id, r]));
 
   return (
-    <div className="flex h-full flex-col gap-4 md:flex-row">
+    <div className="flex h-full min-h-0 gap-0">
       {/* Left panel - thread info */}
-      <aside className="rounded-xl border bg-card p-4 flex flex-col gap-4 md:w-72 md:flex-shrink-0">
+      <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r bg-sidebar p-4 md:flex">
         <div>
           <h2 className="text-lg font-semibold leading-snug">{selected.title}</h2>
           {selected.description && (
@@ -180,76 +184,76 @@ export function ThreadDetailPage() {
         </div>
       </aside>
 
-      <Separator orientation="vertical" className="hidden md:block" />
-
       {/* Right panel - messages */}
-      <div className="flex flex-1 flex-col gap-3 overflow-hidden">
-        <ScrollArea className="flex-1 rounded-xl border bg-muted/10" >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ScrollArea className="flex-1 overflow-hidden bg-muted/5">
           <div className="p-4">
             <div className="flex flex-col gap-3">
-            {messages.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No messages yet. Send one to start the thread.
-              </p>
-            ) : (
-              messages.map((msg) => {
-                const run = msg.run_id ? runMap[msg.run_id] : null;
+              {messages.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  No messages yet. Send one to start the thread.
+                </p>
+              ) : (
+                messages.map((msg) => {
+                  const run = msg.run_id ? runMap[msg.run_id] : null;
 
-                if (msg.author === 'system') {
+                  if (msg.author === 'system') {
+                    return (
+                      <div key={msg.id} className="flex justify-center">
+                        <span className="mx-auto rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                          {msg.content}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  const isHuman = msg.author === 'human';
                   return (
-                    <div key={msg.id} className="flex justify-center">
-                      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                        {msg.content}
-                      </span>
+                    <div
+                      key={msg.id}
+                      className={cn('flex flex-col gap-1', isHuman ? 'items-end' : 'items-start')}
+                    >
+                      <div
+                        className={cn(
+                          'max-w-[75%] rounded-2xl px-4 py-2.5 text-sm',
+                          isHuman
+                            ? 'rounded-br-sm bg-primary text-primary-foreground'
+                            : 'rounded-bl-sm bg-muted text-foreground',
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {run && <RunStatusBadge status={run.status} />}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
                     </div>
                   );
-                }
-
-                const isHuman = msg.author === 'human';
-                return (
-                  <div
-                    key={msg.id}
-                    className={cn('flex flex-col gap-1', isHuman ? 'items-end' : 'items-start')}
-                  >
-                    <div
-                      className={cn(
-                        'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
-                        isHuman
-                          ? 'rounded-br-sm bg-primary text-primary-foreground'
-                          : 'rounded-bl-sm bg-muted text-foreground',
-                      )}
-                    >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {run && <RunStatusBadge status={run.status} />}
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(msg.created_at).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
           </div>
         </ScrollArea>
 
-        <form onSubmit={handleSend} className="rounded-xl border bg-card p-3 flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Send a message... (Ctrl+Enter to send)"
-            rows={2}
-            className="flex-1 resize-none"
-            disabled={sending}
-          />
-          <Button type="submit" size="icon" disabled={sending || !input.trim()} className="self-end">
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send</span>
-          </Button>
+        <form className="shrink-0 border-t bg-background p-4" onSubmit={handleSend}>
+          <div className="flex items-end gap-2">
+            <Textarea
+              className="min-h-[2.5rem] flex-1 resize-none"
+              rows={2}
+              placeholder="Send a message... (Ctrl+Enter)"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={sending}
+            />
+            <Button type="submit" size="icon" className="shrink-0" disabled={sending || !input.trim()}>
+              <Send className="size-4" />
+              <span className="sr-only">Send</span>
+            </Button>
+          </div>
         </form>
       </div>
     </div>

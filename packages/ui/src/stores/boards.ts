@@ -30,14 +30,8 @@ export const useBoardsStore = create<BoardsState>((set) => ({
   async fetchWithColumns(boardId: string) {
     set({ loading: true, error: null });
     try {
-      const { board, columns } = await boardsApi.getWithColumns(boardId);
-      set((s) => ({
-        boards: s.boards.some((b) => b.id === board.id)
-          ? s.boards.map((b) => (b.id === board.id ? board : b))
-          : [...s.boards, board],
-        columns,
-        loading: false,
-      }));
+      const { columns } = await boardsApi.getWithColumns(boardId);
+      set({ columns, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
     }

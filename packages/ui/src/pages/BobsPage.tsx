@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Bot } from 'lucide-react';
 import { useBobsStore } from '@/stores/bobs';
 import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,12 +31,24 @@ export function BobsPage() {
   }, [fetch]);
 
   if (error) {
-    return <ErrorState description={error} onRetry={fetch} />;
+    return (
+      <div className="px-6 py-6">
+        <ErrorState description={error} onRetry={fetch} />
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <h2 className="text-2xl font-bold">Bobs</h2>
+    <div className="flex flex-col gap-6 px-6 py-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+            <Bot className="size-6" />
+            Bobs
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Registered agent connectors.</p>
+        </div>
+      </div>
 
       {loading ? (
         <TableSkeleton />

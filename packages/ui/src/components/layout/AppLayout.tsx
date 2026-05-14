@@ -9,11 +9,11 @@ export function AppLayout() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="flex h-screen overflow-hidden bg-muted/20">
         <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header onOpenMobileNav={() => setMobileNavOpen(true)} />
-          <main className="flex-1 overflow-auto p-4 md:p-6">
+          <main className="flex min-h-0 flex-1 flex-col overflow-auto">
             <Outlet />
           </main>
         </div>

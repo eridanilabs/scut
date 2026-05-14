@@ -108,16 +108,17 @@ export function MootPage() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div>
-          <h2 className="text-xl font-bold">{project?.name ?? 'Board'}</h2>
+    <div className="flex h-full flex-col">
+      {/* Board header bar */}
+      <div className="flex shrink-0 items-center justify-between border-b bg-background px-6 py-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold">{project?.name ?? 'Board'}</h2>
           {project?.description && (
-            <p className="text-sm text-muted-foreground">{project.description}</p>
+            <p className="truncate text-sm text-muted-foreground">{project.description}</p>
           )}
         </div>
-        <Button onClick={() => setCreateThreadOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New Thread
+        <Button size="sm" onClick={() => setCreateThreadOpen(true)}>
+          <Plus className="mr-1.5 size-4" /> New Thread
         </Button>
       </div>
 
@@ -128,8 +129,8 @@ export function MootPage() {
           ))}
         </div>
       ) : columns.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-16 text-center text-muted-foreground">
-          <p>No board configured for this project.</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+          <p className="text-sm">No board configured for this project.</p>
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain p-4 pb-2 md:snap-none">

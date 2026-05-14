@@ -1,17 +1,17 @@
-import { Menu, Moon, Sun, Monitor } from 'lucide-react';
+import { Menu, Monitor, Moon, Sun } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useThemeStore } from '@/stores/theme';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { type ThemeMode, useThemeStore } from '@/stores/theme';
 
 interface HeaderProps {
   onOpenMobileNav: () => void;
 }
+
+const themeModeOrder: ThemeMode[] = ['light', 'dark', 'system'];
+const themeLabelMap: Record<ThemeMode, string> = { light: 'Light', dark: 'Dark', system: 'System' };
+const themeIconMap = { light: Sun, dark: Moon, system: Monitor } satisfies Record<ThemeMode, typeof Sun>;
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/') return 'Projects';
@@ -22,50 +22,48 @@ function getPageTitle(pathname: string): string {
 }
 
 export function Header({ onOpenMobileNav }: HeaderProps) {
-  const location = useLocation();
-  const { theme, setTheme } = useThemeStore();
+  const { pathname } = useLocation();
+  const mode = useThemeStore((s) => s.theme);
+  const setTheme = useThemeStore((s) => s.setTheme);
+
+  const currentIndex = themeModeOrder.indexOf(mode);
+  const nextMode = themeModeOrder[(currentIndex + 1) % themeModeOrder.length] ?? 'system';
+  const ThemeIcon = themeIconMap[mode];
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="md:hidden"
-        onClick={onOpenMobileNav}
-      >
-        <Menu className="h-5 w-5" />
-        <span className="sr-only">Open navigation</span>
-      </Button>
+    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background/95 px-3 backdrop-blur supports-backdrop-filter:bg-background/80 sm:h-16 sm:px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <Button
+          className="size-11 md:hidden"
+          onClick={onOpenMobileNav}
+          type="button"
+          variant="ghost"
+        >
+          <Menu className="size-5" />
+          <span className="sr-only">Open navigation menu</span>
+        </Button>
+        <Separator className="hidden h-6 md:block" orientation="vertical" />
+        <p className="truncate text-base font-semibold sm:text-lg">
+          {getPageTitle(pathname)}
+        </p>
+      </div>
 
-      <h1 className="flex-1 text-lg font-semibold">
-        {getPageTitle(location.pathname)}
-      </h1>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            {theme === 'dark' ? (
-              <Moon className="h-5 w-5" />
-            ) : theme === 'light' ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Monitor className="h-5 w-5" />
-            )}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setTheme('light')}>
-            <Sun className="mr-2 h-4 w-4" /> Light
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTheme('dark')}>
-            <Moon className="mr-2 h-4 w-4" /> Dark
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTheme('system')}>
-            <Monitor className="mr-2 h-4 w-4" /> System
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="size-11"
+              onClick={() => setTheme(nextMode)}
+              type="button"
+              variant="ghost"
+            >
+              <ThemeIcon className="size-4" />
+              <span className="sr-only">{`Theme: ${themeLabelMap[mode]}. Switch to ${themeLabelMap[nextMode]}.`}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{`Switch to ${themeLabelMap[nextMode]}`}</TooltipContent>
+        </Tooltip>
+      </div>
     </header>
   );
 }
