@@ -10,7 +10,7 @@
 |-------|----------|-------|
 | 1 | bill-0kg | DB layer |
 | 2 | bill-s9h | API routes |
-| 3 | bill-bjl | IBobConnector + Phase 1 reference connector |
+| 3 | bill-bjl | IReplicantConnector + Phase 1 reference connector |
 | 4 | bill-qhs | Seed script |
 | 5 | bill-38g | UI scaffold |
 | 6 | bill-ol2 | Moot board UI |
@@ -45,12 +45,12 @@
 | P1-08 | `GET /api/threads/:id/runs` | pending |
 | P1-09 | `POST /api/internal/runs/:id/result` callback endpoint | pending |
 
-## Block 3: Connector Interface + Phase 1 Reference Connector (CopilotBridgeBob)
+## Block 3: Connector Interface + Phase 1 Reference Connector (CopilotBridgeConnector)
 
 | ID | Task | Status |
 |----|------|--------|
-| P1-10 | Write `IBobConnector` interface and shared types | pending |
-| P1-11 | Implement `CopilotBridgeBob` connector | pending |
+| P1-10 | Write `IReplicantConnector` interface and shared types | pending |
+| P1-11 | Implement `CopilotBridgeConnector` (Phase 1 reference) | pending |
 | P1-12 | Write connector `registry.ts` (startup init from bobs table) | pending |
 
 ## Block 4: Seed Script

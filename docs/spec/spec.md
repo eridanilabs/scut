@@ -40,14 +40,14 @@ SCUT (Structured Coordination Utility for Tasks) is an agnostic multi-agent coor
 |   +------------+  +------------+  +------------------+  |
 |                                                          |
 |   +--------------------------------------------------+   |
-|   |              IBobConnector interface              |   |
+|   |              IReplicantConnector interface         |   |
 |   +--------+----------+-----------+------------------+   |
 |            |          |           |                       |
 +------------|----------|-----------|---------------------  |
              |          |           |
-   +---------+--+ +-----+-----+ +--+----------+
-   |CopilotBridge| |ClaudeCode | |  A2ABob     |
-   |    Bob      | |   Bob     | |             |
+   +---------+--------+ +----------+--+ +--------------+
+   |CopilotBridge     | |ClaudeCode   | |  A2A         |
+   |Connector         | |Connector    | |  Connector   |
    +-------------+ +-----------+ +-------------+
           |              |              |
    copilot-bridge   claude CLI     remote A2A
@@ -150,7 +150,7 @@ created --> queued --> running --> completed
 
 ## 4. Connector Interface
 
-Every Bob connector implements `IBobConnector`. The interface is intentionally thin: SCUT's job is to route and track, not to dictate how the harness works internally.
+Every Bob connector implements `IReplicantConnector`. The interface is intentionally thin: SCUT's job is to route and track, not to dictate how the harness works internally.
 
 ```typescript
 export type BobStatus = {
@@ -184,7 +184,7 @@ export type Run = {
   updatedAt: string;
 };
 
-export interface IBobConnector {
+export interface IReplicantConnector {
   /**
    * Dispatch a Run to the Bob. Fire-and-forget.
    * Resolves when the run has been accepted (queued or started), not when complete.
@@ -347,7 +347,7 @@ Side effects:
 
 ## 6. Connector Implementations (Planned)
 
-### `CopilotBridgeBob`
+### `CopilotBridgeConnector`
 
 Wraps the copilot-bridge HTTP channel adapter. Translates a Run into a copilot-bridge channel invocation. Results come back via the bridge's existing webhook/callback mechanism, forwarded to SCUT's internal result endpoint.
 
@@ -355,7 +355,7 @@ Wraps the copilot-bridge HTTP channel adapter. Translates a Run into a copilot-b
 - Transport: HTTP (copilot-bridge's own API)
 - Status: Phase 1 target
 
-### `ClaudeCodeBob`
+### `ClaudeCodeConnector`
 
 Drives the `claude` CLI via subprocess. Launches `claude` with the Run input as a prompt, captures stdout as the result, and posts to the result callback. Supports cancellation via process kill.
 
@@ -363,7 +363,7 @@ Drives the `claude` CLI via subprocess. Launches `claude` with the Run input as 
 - Transport: subprocess (stdin/stdout)
 - Status: Phase 3 target
 
-### `SubprocessBob`
+### `SubprocessConnector`
 
 Generic subprocess connector. Launches a configurable command with the Run input on stdin, reads the result from stdout. Enables any CLI-based agent to be connected with minimal configuration.
 
@@ -372,7 +372,7 @@ Generic subprocess connector. Launches a configurable command with the Run input
 - Config: `{ command: string, args: string[] }`
 - Status: Phase 3 target
 
-### `A2ABob`
+### `A2AConnector`
 
 Connects to a remote agent via the Google A2A (Agent-to-Agent) protocol. Translates a Run into an A2A task submission. Polls or subscribes to A2A task status updates and posts results back to SCUT's callback endpoint.
 
@@ -381,7 +381,7 @@ Connects to a remote agent via the Google A2A (Agent-to-Agent) protocol. Transla
 - Config: `{ agentCardUrl: string, auth?: object }`
 - Status: Phase 3 target
 
-### `ACPBob`
+### `ACPConnector`
 
 Connects to a local agent via the IBM ACP (Agent Communication Protocol). Designed for locally-running agents (local LLMs, edge services).
 
@@ -396,17 +396,17 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 
 ### Phase 1 - MVP
 
-**Goal:** A working board where you can create threads, assign a CopilotBridgeBob, and see results.
+**Goal:** A working board where you can create threads, assign a Bob, and see results.
 
 **Deliverables:**
 - Thread / Message / Run / Bob data model fully implemented
 - Fastify API: all endpoints in section 5 (except SSE)
 - SQLite database with migrations
-- `CopilotBridgeBob` connector implementation
+- `CopilotBridgeConnector` as the Phase 1 reference `IReplicantConnector` implementation
 - Basic React board (list threads, create thread, view thread detail)
 - Manual Bob registration via API or seed script
 
-**Success criteria:** A human can create a thread in the Moot, assign it to a CopilotBridgeBob, add a message, and see the Bob's result appear in the thread history.
+**Success criteria:** A human can create a thread in the Moot, assign it to a Bob, add a message, and see the Bob's result appear in the thread history.
 
 ### Phase 2 - Real-Time and Run Tracking
 
@@ -425,20 +425,20 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 **Goal:** Connect Claude Code and Codex via subprocess. Connect a remote A2A agent.
 
 **Deliverables:**
-- `SubprocessBob` connector (generic)
-- `ClaudeCodeBob` connector (uses SubprocessBob with claude CLI)
-- `A2ABob` connector
+- `SubprocessConnector` (generic)
+- `ClaudeCodeConnector` (uses SubprocessConnector with claude CLI)
+- `A2AConnector`
 - Moot UI: Bob type selector when assigning a Bob to a thread
 - Run input editing before dispatch
 
-**Success criteria:** A thread can be reassigned from a CopilotBridgeBob to a ClaudeCodeBob mid-conversation, and the new Bob picks up from the thread history.
+**Success criteria:** A thread can be reassigned from a `CopilotBridgeConnector` Bob to a `ClaudeCodeConnector` Bob mid-conversation, and the new Bob picks up from the thread history.
 
 ### Phase 4 - Local-First and Parallel Dispatch
 
 **Goal:** ACP support and multi-Bob parallelism.
 
 **Deliverables:**
-- `ACPBob` connector
+- `ACPConnector`
 - Parallel dispatch: send a Thread to multiple Bobs simultaneously, compare results
 - Thread branching: fork a thread to explore two approaches in parallel
 - Moot UI: parallel run comparison view

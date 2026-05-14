@@ -6,12 +6,12 @@ Deliver a working coordination board (the Moot) where a human operator can creat
 
 ## Problem Statement
 
-Multi-agent orchestration across multiple agent harnesses is currently manual and stateless. There is no durable record of what was asked, what was answered, or which agent handled it. Phase 1 establishes the coordination plane: a persistent data model, a REST API, a pluggable connector interface, and a board UI to tie them together. The connector interface (`IBobConnector`) is harness-agnostic; any agent harness can be connected via a thin adapter. Phase 1 ships one reference connector implementation to prove the pattern.
+Multi-agent orchestration across multiple agent harnesses is currently manual and stateless. There is no durable record of what was asked, what was answered, or which agent handled it. Phase 1 establishes the coordination plane: a persistent data model, a REST API, a pluggable connector interface, and a board UI to tie them together. The connector interface (`IReplicantConnector`) is harness-agnostic; any agent harness can be connected via a thin adapter. Phase 1 ships one reference connector implementation to prove the pattern.
 
 ## Users
 
 - **Human operator**: creates threads, assigns Bobs, reads results, advances thread status
-- **Bob (agent connector)**: receives dispatched runs via `IBobConnector.dispatch`, posts results back via the internal callback endpoint
+- **Bob (replicant connector)**: receives dispatched runs via `IReplicantConnector.dispatch`, posts results back via the internal callback endpoint
 
 ## User Stories
 
@@ -26,7 +26,7 @@ Multi-agent orchestration across multiple agent harnesses is currently manual an
 
 - A thread can be created, updated, and listed via the REST API.
 - A Bob connector can be registered and its status queried.
-- Posting a message to a thread with an assigned Bob creates and dispatches a Run via `IBobConnector.dispatch`.
+- Posting a message to a thread with an assigned Bob creates and dispatches a Run via `IReplicantConnector.dispatch`.
 - The Bob's result comes back via the internal callback endpoint and appears as a message in the thread.
 - The Moot UI shows the thread board and thread detail without errors.
 - The server starts from a clean database with no manual setup beyond configuration.
@@ -47,4 +47,4 @@ Multi-agent orchestration across multiple agent harnesses is currently manual an
 - UI borrows visual structure and component patterns from `raykao/copilot-bridge-kanban` - layout, shadcn/ui components, Tailwind CSS v4, react-router-dom v7, zustand for state, fetch for data fetching
 - SQLite via better-sqlite3 (synchronous, no ORM)
 - No authentication in Phase 1
-- Connector interface (`IBobConnector`) must not reference any specific harness. The Phase 1 reference connector is one implementation of that interface; swapping it for a different harness must require no changes to SCUT core.
+- Connector interface (`IReplicantConnector`) must not reference any specific harness. The Phase 1 reference connector is one implementation of that interface; swapping it for a different harness must require no changes to SCUT core.

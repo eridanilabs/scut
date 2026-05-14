@@ -14,8 +14,8 @@ packages/
         messages.ts     - Message queries
         runs.ts         - Run queries
       connectors/
-        IBobConnector.ts         - interface + shared types
-        CopilotBridgeBob.ts      - Phase 1 reference connector (copilot-bridge HTTP)
+        IReplicantConnector.ts   - interface + shared types
+        CopilotBridgeConnector.ts - Phase 1 reference connector (copilot-bridge HTTP)
         registry.ts              - in-memory connector registry
       routes/
         bobs.ts          - GET /api/bobs, POST /api/bobs
@@ -81,25 +81,25 @@ Auto-dispatch logic (in POST /api/threads/:id/messages):
 - Call `connector.dispatch(run, thread)` - fire-and-forget
 - Return `{ message, run }`
 
-### Block 3: IBobConnector + Phase 1 Reference Connector
+### Block 3: IReplicantConnector + Phase 1 Reference Connector
 
-`IBobConnector` interface (TypeScript):
+`IReplicantConnector` interface (TypeScript):
 - `dispatch(run, thread): Promise<void>`
 - `cancel(runId): Promise<void>`
 - `status(): BobStatus` (sync is fine for Phase 1)
 
 The interface must contain no harness-specific types or imports. Each connector is a self-contained adapter.
 
-`CopilotBridgeBob` (Phase 1 reference connector):
+`CopilotBridgeConnector` (Phase 1 reference connector):
 - Config: `{ baseUrl: string, channelId: string, token: string }`
 - `dispatch`: POST the run input to the copilot-bridge HTTP channel endpoint, set run status to `queued`, return
 - Result comes back asynchronously via `POST /api/internal/runs/:id/result`
 - `cancel`: PATCH the bridge run to cancelled, best-effort
 - `status`: GET the bridge health endpoint
 
-This connector is one implementation. Any other harness (subprocess, A2A, ACP, etc.) can be plugged in by implementing `IBobConnector` without touching SCUT core.
+This connector is one implementation. Any other harness (subprocess, A2A, ACP, etc.) can be plugged in by implementing `IReplicantConnector` without touching SCUT core.
 
-Connector registry: a `Map<bobId, IBobConnector>` initialized at startup. Connector instances are created from the `bobs` table `harness` + `config` columns on startup.
+Connector registry: a `Map<bobId, IReplicantConnector>` initialized at startup. Connector instances are created from the `bobs` table `harness` + `config` columns on startup.
 
 ### Block 4: Seed Script
 
