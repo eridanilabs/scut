@@ -7,20 +7,25 @@ import { MootPage } from './pages/MootPage';
 import { ThreadDetailPage } from './pages/ThreadDetailPage';
 import { BobsPage } from './pages/BobsPage';
 import { MessagesPage } from './pages/messages/MessagesPage';
+import { LoginPage } from './pages/LoginPage';
+import { RequireAuth } from './components/layout/RequireAuth';
 
 export function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
         <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<ProjectsPage />} />
-            <Route path="/projects/:projectId" element={<MootPage />} />
-            <Route path="/threads/:threadId" element={<ThreadDetailPage />} />
-            <Route path="/bobs" element={<BobsPage />} />
-            <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/messages/:agentId" element={<MessagesPage />} />
-            <Route path="/messages/:agentId/:sessionId" element={<MessagesPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<ProjectsPage />} />
+              <Route path="/projects/:projectId" element={<MootPage />} />
+              <Route path="/threads/:threadId" element={<ThreadDetailPage />} />
+              <Route path="/bobs" element={<BobsPage />} />
+              <Route path="/messages" element={<MessagesPage />} />
+              <Route path="/messages/:agentId" element={<MessagesPage />} />
+              <Route path="/messages/:agentId/:sessionId" element={<MessagesPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<Navigate replace to="/" />} />
         </Routes>
