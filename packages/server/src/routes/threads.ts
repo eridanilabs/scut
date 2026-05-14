@@ -15,12 +15,41 @@ export default async function threadRoutes(app: FastifyInstance) {
     return thread;
   });
 
-  app.post<{ Body: { title: string; description?: string; status?: string; bobId?: string | null; metadata?: Record<string, unknown> } }>('/api/threads', async (request, reply) => {
+  app.post<{ Body: { title: string; description?: string; status?: string; bobId?: string | null; metadata?: Record<string, unknown> } }>('/api/threads', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['title'],
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          status: { type: 'string' },
+          bobId: { type: ['string', 'null'] },
+          metadata: { type: 'object' },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const created = createThread(request.body);
     return reply.status(201).send(created);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; description: string; status: string; bobId: string | null; metadata: Record<string, unknown> }> }>('/api/threads/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string }; Body: Partial<{ title: string; description: string; status: string; bobId: string | null; metadata: Record<string, unknown> }> }>('/api/threads/:id', {
+    schema: {
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          status: { type: 'string' },
+          bobId: { type: ['string', 'null'] },
+          metadata: { type: 'object' },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const updated = updateThread(request.params.id, request.body);
     if (!updated) {
       return reply.status(404).send({ error: 'not found' });

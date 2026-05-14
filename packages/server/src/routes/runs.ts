@@ -48,7 +48,19 @@ export default async function runRoutes(app: FastifyInstance) {
     return run;
   });
 
-  app.post<{ Params: { threadId: string }; Body: { bobId: string; input: string } }>('/api/threads/:threadId/runs', async (request, reply) => {
+  app.post<{ Params: { threadId: string }; Body: { bobId: string; input: string } }>('/api/threads/:threadId/runs', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['bobId', 'input'],
+        additionalProperties: false,
+        properties: {
+          bobId: { type: 'string' },
+          input: { type: 'string' },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const { threadId } = request.params;
     const { bobId, input } = request.body;
 
@@ -69,13 +81,32 @@ export default async function runRoutes(app: FastifyInstance) {
     // Fire and forget - do not await
     connector.dispatch(run, threadObj).catch((err: unknown) => {
       app.log.error({ err, runId: run.id }, 'connector.dispatch failed');
+      updateRun(run.id, {
+        status: 'failed',
+        error: String(err),
+        completedAt: new Date().toISOString(),
+      });
     });
 
     const updated = updateRun(run.id, { status: 'queued' });
     return reply.status(201).send(updated);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }> }>('/api/runs/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string }; Body: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }> }>('/api/runs/:id', {
+    schema: {
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string' },
+          output: { type: ['string', 'null'] },
+          error: { type: ['string', 'null'] },
+          startedAt: { type: ['string', 'null'] },
+          completedAt: { type: ['string', 'null'] },
+        },
+      },
+    },
+  }, async (request, reply) => {
     const updated = updateRun(request.params.id, request.body);
     if (!updated) {
       return reply.status(404).send({ error: 'not found' });

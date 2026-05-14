@@ -4,6 +4,7 @@ import threadRoutes from './routes/threads.js';
 import messageRoutes from './routes/messages.js';
 import runRoutes from './routes/runs.js';
 import internalRoutes from './routes/internal.js';
+import { bootstrapConnectors } from './bootstrap/connectors.js';
 
 const server = Fastify({ logger: true });
 
@@ -16,6 +17,8 @@ await server.register(threadRoutes);
 await server.register(messageRoutes);
 await server.register(runRoutes);
 await server.register(internalRoutes);
+
+bootstrapConnectors();
 
 const start = async () => {
   try {

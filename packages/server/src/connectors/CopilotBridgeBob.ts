@@ -17,6 +17,7 @@ export class CopilotBridgeBob implements IBobConnector {
       description: thread.description,
       input: run.input,
       callbackUrl: this.config.callbackUrl,
+      callbackSecret: process.env.SCUT_CALLBACK_SECRET,
     };
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

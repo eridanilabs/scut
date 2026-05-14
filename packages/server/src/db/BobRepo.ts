@@ -31,25 +31,30 @@ export function createBob(fields: { name: string; harness: string; config?: Reco
   return getBob(id)!;
 }
 
-export function updateBob(id: string, fields: Partial<{ name: string; harness: string; config: Record<string, unknown>; status: string }>): BobRow | undefined {
-  const entries = Object.entries(fields);
-  if (entries.length === 0) {
-    return getBob(id);
-  }
+export function updateBob(
+  id: string,
+  fields: Partial<{ name: string; harness: string; config: Record<string, unknown>; status: string }>
+): BobRow | undefined {
+  const ALLOWED = new Set(['name', 'harness', 'status']);
   const setClauses: string[] = [];
   const values: unknown[] = [];
-  for (const [key, value] of entries) {
+
+  for (const [key, value] of Object.entries(fields)) {
     if (key === 'config') {
       setClauses.push('config = ?');
       values.push(JSON.stringify(value));
-    } else {
+    } else if (ALLOWED.has(key)) {
       setClauses.push(`${key} = ?`);
       values.push(value);
     }
+    // silently skip unknown keys
   }
+
+  if (setClauses.length === 0) return getBob(id);
+
   setClauses.push("updated_at = datetime('now')");
-  values.push(id);
-  db.prepare(`UPDATE bobs SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+  const sql = `UPDATE bobs SET ${setClauses.join(', ')} WHERE id = ?`;
+  db.prepare(sql).run(...values, id);
   return getBob(id);
 }
 

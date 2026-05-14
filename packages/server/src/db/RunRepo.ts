@@ -30,27 +30,32 @@ export function createRun(fields: { threadId: string; bobId: string; input: stri
   return getRun(id)!;
 }
 
-export function updateRun(id: string, fields: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }>): RunRow | undefined {
-  const entries = Object.entries(fields);
-  if (entries.length === 0) {
-    return getRun(id);
-  }
+export function updateRun(
+  id: string,
+  fields: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }>
+): RunRow | undefined {
+  const ALLOWED_DIRECT = new Set(['status', 'output', 'error']);
   const setClauses: string[] = [];
   const values: unknown[] = [];
-  for (const [key, value] of entries) {
+
+  for (const [key, value] of Object.entries(fields)) {
     if (key === 'startedAt') {
       setClauses.push('started_at = ?');
       values.push(value);
     } else if (key === 'completedAt') {
       setClauses.push('completed_at = ?');
       values.push(value);
-    } else {
+    } else if (ALLOWED_DIRECT.has(key)) {
       setClauses.push(`${key} = ?`);
       values.push(value);
     }
+    // silently skip unknown keys
   }
+
+  if (setClauses.length === 0) return getRun(id);
+
   setClauses.push("updated_at = datetime('now')");
-  values.push(id);
-  db.prepare(`UPDATE runs SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+  const sql = `UPDATE runs SET ${setClauses.join(', ')} WHERE id = ?`;
+  db.prepare(sql).run(...values, id);
   return getRun(id);
 }

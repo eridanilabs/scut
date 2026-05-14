@@ -42,28 +42,33 @@ export function createThread(fields: { title: string; description?: string; stat
   return getThread(id)!;
 }
 
-export function updateThread(id: string, fields: Partial<{ title: string; description: string; status: string; bobId: string | null; metadata: Record<string, unknown> }>): ThreadRow | undefined {
-  const entries = Object.entries(fields);
-  if (entries.length === 0) {
-    return getThread(id);
-  }
+export function updateThread(
+  id: string,
+  fields: Partial<{ title: string; description: string; status: string; bobId: string | null; metadata: Record<string, unknown> }>
+): ThreadRow | undefined {
+  const ALLOWED_DIRECT = new Set(['title', 'description', 'status']);
   const setClauses: string[] = [];
   const values: unknown[] = [];
-  for (const [key, value] of entries) {
-    if (key === 'bobId') {
-      setClauses.push('bob_id = ?');
-      values.push(value);
-    } else if (key === 'metadata') {
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (key === 'metadata') {
       setClauses.push('metadata = ?');
       values.push(JSON.stringify(value));
-    } else {
+    } else if (key === 'bobId') {
+      setClauses.push('bob_id = ?');
+      values.push(value);
+    } else if (ALLOWED_DIRECT.has(key)) {
       setClauses.push(`${key} = ?`);
       values.push(value);
     }
+    // silently skip unknown keys
   }
+
+  if (setClauses.length === 0) return getThread(id);
+
   setClauses.push("updated_at = datetime('now')");
-  values.push(id);
-  db.prepare(`UPDATE threads SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+  const sql = `UPDATE threads SET ${setClauses.join(', ')} WHERE id = ?`;
+  db.prepare(sql).run(...values, id);
   return getThread(id);
 }
 
