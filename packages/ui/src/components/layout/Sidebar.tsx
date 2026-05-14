@@ -56,7 +56,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 
       {/* Nav items */}
       <ScrollArea className="flex min-h-0 flex-1 flex-col w-full">
-        <div className={cn('py-2 flex flex-col', collapsed ? 'items-center gap-1 px-0' : 'space-y-0.5 px-2')}>
+        <div className={cn('py-2 flex flex-col', collapsed ? 'items-center gap-1 px-0' : 'gap-1 px-2')}>
           {primaryNav.map(({ icon: Icon, label, href }) => {
             const active = isPathActive(location.pathname, href);
             const itemClass = cn(
