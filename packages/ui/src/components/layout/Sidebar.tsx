@@ -56,7 +56,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 
       {/* Nav items */}
       <ScrollArea className="flex min-h-0 flex-1 flex-col w-full">
-        <div className={cn('py-3 flex flex-col', collapsed ? 'items-center gap-1' : 'space-y-0.5 px-2')}>
+        <div className={cn('py-2 flex flex-col', collapsed ? 'items-center gap-1 px-0' : 'space-y-0.5 px-2')}>
           {primaryNav.map(({ icon: Icon, label, href }) => {
             const active = isPathActive(location.pathname, href);
             const itemClass = cn(
@@ -64,7 +64,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               active
                 ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2.5 py-2 w-full',
+              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2 py-2 w-full',
             );
 
             if (collapsed) {
@@ -89,12 +89,12 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
       </ScrollArea>
 
       {/* Toggle button - always at bottom, icon aligned with nav icons */}
-      <div className={cn('py-2 flex flex-col', collapsed ? 'items-center' : 'px-2')}>
+      <div className={cn('py-2 flex flex-col', collapsed ? 'items-center px-0' : 'px-2')}>
         <Tooltip>
           <TooltipTrigger
             className={cn(
               'flex items-center rounded-lg transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2.5 py-2 w-full',
+              collapsed ? 'size-11 justify-center' : 'min-h-11 gap-2.5 px-2 py-2 w-full',
             )}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={toggleSidebar}
