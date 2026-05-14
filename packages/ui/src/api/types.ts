@@ -97,3 +97,21 @@ export interface Run {
   created_at: string;
   updated_at: string;
 }
+
+export interface DmSession {
+  id: string;
+  agent_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+}
+
+export interface DmMessage {
+  id: string;
+  session_id: string;
+  author: 'human' | 'agent' | 'system';
+  content: string;
+  created_at: string;
+}

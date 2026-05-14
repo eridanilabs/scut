@@ -8,6 +8,8 @@ import type {
   Run,
   MessageAuthor,
   ThreadStatus,
+  DmSession,
+  DmMessage,
 } from './types';
 
 // ---- Seed data ----
@@ -677,4 +679,123 @@ export function updateMockRun(id: string, threadId: string, patch: Partial<Run>)
   const updated = { ...list[idx], ...patch, updated_at: new Date().toISOString() };
   list[idx] = updated;
   return updated;
+}
+
+// ---- DM seed data ----
+
+export function formatSessionTitle(isoDate: string): string {
+  return new Date(isoDate).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+export const mockDmSessions: DmSession[] = [
+  {
+    id: 'dm-session-1',
+    agent_id: 'bob-bridge',
+    title: formatSessionTitle(PAST(86_400_000 * 2)),
+    last_message_preview: 'Sure, I can help with that.',
+    last_message_at: PAST(86_400_000 * 2),
+    created_at: PAST(86_400_000 * 2),
+    updated_at: PAST(86_400_000 * 2),
+  },
+  {
+    id: 'dm-session-2',
+    agent_id: 'bob-bridge',
+    title: formatSessionTitle(PAST(3_600_000)),
+    last_message_preview: 'The schema looks good to me.',
+    last_message_at: PAST(3_600_000),
+    created_at: PAST(3_600_000),
+    updated_at: PAST(3_600_000),
+  },
+  {
+    id: 'dm-session-3',
+    agent_id: 'bob-claude',
+    title: formatSessionTitle(PAST(86_400_000)),
+    last_message_preview: 'Let me think about that...',
+    last_message_at: PAST(86_400_000),
+    created_at: PAST(86_400_000),
+    updated_at: PAST(86_400_000),
+  },
+];
+
+export const mockDmMessages: Record<string, DmMessage[]> = {
+  'dm-session-1': [
+    { id: 'dm-msg-1', session_id: 'dm-session-1', author: 'human', content: 'Hey, can you help me set up the API routes?', created_at: PAST(86_400_000 * 2 + 5000) },
+    { id: 'dm-msg-2', session_id: 'dm-session-1', author: 'agent', content: 'Sure, I can help with that.', created_at: PAST(86_400_000 * 2) },
+  ],
+  'dm-session-2': [
+    { id: 'dm-msg-3', session_id: 'dm-session-2', author: 'human', content: 'Can you review the DB schema I drafted?', created_at: PAST(3_600_000 + 5000) },
+    { id: 'dm-msg-4', session_id: 'dm-session-2', author: 'agent', content: 'The schema looks good to me.', created_at: PAST(3_600_000) },
+  ],
+  'dm-session-3': [
+    { id: 'dm-msg-5', session_id: 'dm-session-3', author: 'human', content: 'What is the best way to handle session context?', created_at: PAST(86_400_000 + 5000) },
+    { id: 'dm-msg-6', session_id: 'dm-session-3', author: 'agent', content: 'Let me think about that...', created_at: PAST(86_400_000) },
+  ],
+};
+
+// ---- DM mutable state ----
+
+const _dmSessions: DmSession[] = [...mockDmSessions];
+const _dmMessages: Record<string, DmMessage[]> = Object.fromEntries(
+  Object.entries(mockDmMessages).map(([k, v]) => [k, [...v]])
+);
+
+export function getMockDmSessions(agentId: string): DmSession[] {
+  return _dmSessions.filter(s => s.agent_id === agentId).sort((a, b) =>
+    new Date(b.last_message_at ?? b.created_at).getTime() - new Date(a.last_message_at ?? a.created_at).getTime()
+  );
+}
+
+export function getAllMockDmSessions(): DmSession[] {
+  return [..._dmSessions];
+}
+
+export function createMockDmSession(agentId: string): DmSession {
+  const now = new Date().toISOString();
+  const session: DmSession = {
+    id: crypto.randomUUID(),
+    agent_id: agentId,
+    title: formatSessionTitle(now),
+    last_message_preview: null,
+    last_message_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+  _dmSessions.push(session);
+  _dmMessages[session.id] = [];
+  return session;
+}
+
+export function renameMockDmSession(sessionId: string, title: string): void {
+  const s = _dmSessions.find(s => s.id === sessionId);
+  if (s) s.title = title;
+}
+
+export function getMockDmMessages(sessionId: string): DmMessage[] {
+  return [...(_dmMessages[sessionId] ?? [])];
+}
+
+export function addMockDmMessage(sessionId: string, content: string): DmMessage {
+  const now = new Date().toISOString();
+  const msg: DmMessage = {
+    id: crypto.randomUUID(),
+    session_id: sessionId,
+    author: 'human',
+    content,
+    created_at: now,
+  };
+  if (!_dmMessages[sessionId]) _dmMessages[sessionId] = [];
+  _dmMessages[sessionId].push(msg);
+  const session = _dmSessions.find(s => s.id === sessionId);
+  if (session) {
+    session.last_message_preview = content.slice(0, 80);
+    session.last_message_at = now;
+    session.updated_at = now;
+  }
+  return msg;
 }

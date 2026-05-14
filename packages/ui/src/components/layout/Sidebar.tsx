@@ -1,4 +1,4 @@
-import { LayoutDashboard, Bot, Layers } from 'lucide-react';
+import { LayoutDashboard, Bot, Layers, MessageSquare } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 
 const primaryNav = [
   { label: 'Projects', href: '/', icon: LayoutDashboard },
+  { label: 'Messages', href: '/messages', icon: MessageSquare },
   { label: 'Replicants', href: '/bobs', icon: Bot },
 ] as const;
 
