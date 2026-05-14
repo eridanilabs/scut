@@ -15,7 +15,7 @@ packages/
         runs.ts         - Run queries
       connectors/
         IBobConnector.ts         - interface + shared types
-        CopilotBridgeBob.ts      - copilot-bridge HTTP connector
+        CopilotBridgeBob.ts      - Phase 1 reference connector (copilot-bridge HTTP)
         registry.ts              - in-memory connector registry
       routes/
         bobs.ts          - GET /api/bobs, POST /api/bobs
@@ -23,7 +23,7 @@ packages/
         messages.ts      - POST /api/threads/:id/messages
         runs.ts          - GET /api/threads/:id/runs
         internal.ts      - POST /api/internal/runs/:id/result
-      seed.ts            - seed a default CopilotBridgeBob for local dev
+      seed.ts            - seed a default Bob connector for local dev
       index.ts           - Fastify app init, plugin registration, server start
 
   ui/                   - React + Vite Moot board
@@ -81,25 +81,29 @@ Auto-dispatch logic (in POST /api/threads/:id/messages):
 - Call `connector.dispatch(run, thread)` - fire-and-forget
 - Return `{ message, run }`
 
-### Block 3: IBobConnector + CopilotBridgeBob
+### Block 3: IBobConnector + Phase 1 Reference Connector
 
 `IBobConnector` interface (TypeScript):
 - `dispatch(run, thread): Promise<void>`
 - `cancel(runId): Promise<void>`
 - `status(): BobStatus` (sync is fine for Phase 1)
 
-`CopilotBridgeBob`:
+The interface must contain no harness-specific types or imports. Each connector is a self-contained adapter.
+
+`CopilotBridgeBob` (Phase 1 reference connector):
 - Config: `{ baseUrl: string, channelId: string, token: string }`
-- `dispatch`: POST the run input to the copilot-bridge HTTP channel endpoint, record run as `queued`, return
+- `dispatch`: POST the run input to the copilot-bridge HTTP channel endpoint, set run status to `queued`, return
 - Result comes back asynchronously via `POST /api/internal/runs/:id/result`
 - `cancel`: PATCH the bridge run to cancelled, best-effort
 - `status`: GET the bridge health endpoint
 
-Connector registry: a Map<bobId, IBobConnector> initialized at startup. CopilotBridgeBob instances are created from the `bobs` table `config` column on startup.
+This connector is one implementation. Any other harness (subprocess, A2A, ACP, etc.) can be plugged in by implementing `IBobConnector` without touching SCUT core.
+
+Connector registry: a `Map<bobId, IBobConnector>` initialized at startup. Connector instances are created from the `bobs` table `harness` + `config` columns on startup.
 
 ### Block 4: Seed Script
 
-`seed.ts`: upserts a default Bob (id=`default`, harness=`copilot-bridge`) using env vars for config. Run automatically in dev if no Bobs exist. Documents the env vars needed.
+`seed.ts`: upserts a default Bob (id=`default`, harness=`copilot-bridge`) using env vars for config. Run automatically in dev if no Bobs exist. Documents the required env vars. The harness type in the seed is configurable - changing it to a different connector type requires only env var changes, not code changes.
 
 ### Block 5: UI Scaffold (borrow from kanban)
 
@@ -156,7 +160,8 @@ Replace TanStack Query with fetch + zustand. No `@tanstack/react-query` dependen
 ```
 PORT=3000
 DATABASE_PATH=./scut.db
-# For seeding the default CopilotBridgeBob:
+# For seeding the default Bob (Phase 1 uses copilot-bridge connector):
+DEFAULT_BOB_HARNESS=copilot-bridge
 COPILOT_BRIDGE_URL=http://localhost:4000
 COPILOT_BRIDGE_CHANNEL_ID=<channel-id>
 COPILOT_BRIDGE_TOKEN=<token>
