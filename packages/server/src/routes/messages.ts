@@ -3,7 +3,9 @@ import { listMessages, createMessage } from '../db/MessageRepo.js';
 import { getThread } from '../db/ThreadRepo.js';
 
 export default async function messageRoutes(app: FastifyInstance) {
-  app.get<{ Params: { threadId: string } }>('/api/threads/:threadId/messages', async (request) => {
+  app.get<{ Params: { threadId: string } }>('/api/threads/:threadId/messages', async (request, reply) => {
+    const thread = getThread(request.params.threadId);
+    if (!thread) return reply.status(404).send({ error: 'thread not found' });
     return listMessages(request.params.threadId);
   });
 

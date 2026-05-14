@@ -3,12 +3,28 @@ import { getRun, updateRun } from '../db/RunRepo.js';
 import { createMessage } from '../db/MessageRepo.js';
 
 const CALLBACK_SECRET = process.env.SCUT_CALLBACK_SECRET;
+if (!CALLBACK_SECRET) {
+  throw new Error('SCUT_CALLBACK_SECRET env var must be set - internal callback endpoint would be unauthenticated without it');
+}
 
 export default async function internalRoutes(app: FastifyInstance) {
   app.post<{
     Params: { id: string };
     Body: { status: 'completed' | 'failed'; output?: string; error?: string };
-  }>('/api/internal/runs/:id/result', async (request, reply) => {
+  }>('/api/internal/runs/:id/result', {
+    schema: {
+      body: {
+        type: 'object',
+        required: ['status'],
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string', enum: ['completed', 'failed'] },
+          output: { type: 'string' },
+          error: { type: 'string' },
+        },
+      },
+    },
+  }, async (request, reply) => {
     if (CALLBACK_SECRET) {
       const auth = request.headers['x-scut-callback-secret'];
       if (auth !== CALLBACK_SECRET) {
