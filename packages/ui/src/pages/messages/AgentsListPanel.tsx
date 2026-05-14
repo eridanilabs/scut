@@ -1,10 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useBobsStore } from '@/stores/bobs';
 import { dmApi } from '@/api/dm';
 import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
 import { cn } from '@/lib/utils';
-import { useRef, useState } from 'react';
 import type { DmSession } from '@/api/types';
 
 export function AgentsListPanel() {
@@ -13,14 +12,10 @@ export function AgentsListPanel() {
   const bobs = useBobsStore(s => s.bobs);
   const fetchBobs = useBobsStore(s => s.fetch);
   const [allSessions, setAllSessions] = useState<DmSession[]>([]);
-  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (!fetchedRef.current) {
-      fetchedRef.current = true;
-      fetchBobs();
-      dmApi.allSessions().then(setAllSessions);
-    }
+    fetchBobs();
+    dmApi.allSessions().then(setAllSessions);
   }, [fetchBobs]);
 
   function getLastPreview(bobId: string): { preview: string | null; at: string | null } {

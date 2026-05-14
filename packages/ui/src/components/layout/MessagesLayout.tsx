@@ -42,19 +42,17 @@ export function MessagesLayout() {
             const active = isNavActive(location.pathname, href);
             return (
               <Tooltip key={href}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to={href}
-                    className={cn(
-                      'size-11 rounded-lg flex items-center justify-center transition-colors',
-                      active
-                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                    )}
-                    aria-label={label}
-                  >
-                    <Icon className="size-5" />
-                  </Link>
+                <TooltipTrigger
+                  className={cn(
+                    'size-11 rounded-lg flex items-center justify-center transition-colors',
+                    active
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                  )}
+                  aria-label={label}
+                  onClick={() => window.location.href = href}
+                >
+                  <Icon className="size-5" />
                 </TooltipTrigger>
                 <TooltipContent side="right">{label}</TooltipContent>
               </Tooltip>
