@@ -6,13 +6,18 @@ import { useBobsStore } from '@/stores/bobs';
 import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
 import { cn } from '@/lib/utils';
 
+const EMPTY_SESSIONS: never[] = [];
+const EMPTY_MESSAGES: never[] = [];
+
 export function ChatPanel() {
   const { agentId, sessionId } = useParams<{ agentId: string; sessionId: string }>();
   const navigate = useNavigate();
   const bobs = useBobsStore(s => s.bobs);
   const fetchBobs = useBobsStore(s => s.fetch);
-  const sessions = useDmStore(s => (agentId ? (s.sessions[agentId] ?? []) : []));
-  const messages = useDmStore(s => (sessionId ? (s.messages[sessionId] ?? []) : []));
+  const sessionsMap = useDmStore(s => s.sessions);
+  const messagesMap = useDmStore(s => s.messages);
+  const sessions = agentId ? (sessionsMap[agentId] ?? EMPTY_SESSIONS) : EMPTY_SESSIONS;
+  const messages = sessionId ? (messagesMap[sessionId] ?? EMPTY_MESSAGES) : EMPTY_MESSAGES;
   const fetchSessions = useDmStore(s => s.fetchSessions);
   const fetchMessages = useDmStore(s => s.fetchMessages);
   const sendMessage = useDmStore(s => s.sendMessage);
