@@ -1,6 +1,6 @@
 import type { Bob } from './types';
 import { mockFetch } from './client';
-import { getMockBobs, mockBobs } from './mock';
+import { getMockBobs, mockBobs, createMockBob } from './mock';
 
 export const bobsApi = {
   list(): Promise<Bob[]> {
@@ -9,5 +9,9 @@ export const bobsApi = {
 
   get(id: string): Promise<Bob | null> {
     return mockFetch(() => mockBobs.find((b) => b.id === id) ?? null);
+  },
+
+  create(input: { name: string; harness: string }): Promise<Bob> {
+    return mockFetch(() => createMockBob(input));
   },
 };

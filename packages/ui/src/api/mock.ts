@@ -541,6 +541,22 @@ export function getMockBobs(): Bob[] {
   return [..._bobs];
 }
 
+export function createMockBob(input: { name: string; harness: string }): Bob {
+  const now = new Date().toISOString();
+  const bob: Bob = {
+    id: crypto.randomUUID(),
+    name: input.name,
+    harness: input.harness,
+    config: {},
+    status: 'offline',
+    metadata: {},
+    created_at: now,
+    updated_at: now,
+  };
+  _bobs.push(bob);
+  return bob;
+}
+
 export function getMockThreads(
   projectId: string,
   filters?: { status?: string; bob_id?: string },

@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 
 const primaryNav = [
   { label: 'Projects', href: '/', icon: LayoutDashboard },
-  { label: 'Bobs', href: '/bobs', icon: Bot },
+  { label: 'Replicants', href: '/bobs', icon: Bot },
 ] as const;
 
 function isPathActive(pathname: string, href: string): boolean {
@@ -101,7 +101,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <SheetContent className="w-80 p-0" side="left" showCloseButton={false}>
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation menu</SheetTitle>
-            <SheetDescription>Browse projects and bobs.</SheetDescription>
+            <SheetDescription>Browse projects and replicants.</SheetDescription>
           </SheetHeader>
           <SidebarContent onNavigate={onMobileClose} />
         </SheetContent>

@@ -7,9 +7,10 @@ interface BobsState {
   loading: boolean;
   error: string | null;
   fetch(): Promise<void>;
+  create(input: { name: string; harness: string }): Promise<Bob>;
 }
 
-export const useBobsStore = create<BobsState>((set) => ({
+export const useBobsStore = create<BobsState>((set, get) => ({
   bobs: [],
   loading: false,
   error: null,
@@ -22,5 +23,11 @@ export const useBobsStore = create<BobsState>((set) => ({
     } catch (e) {
       set({ error: String(e), loading: false });
     }
+  },
+
+  async create(input) {
+    const bob = await bobsApi.create(input);
+    set({ bobs: [...get().bobs, bob] });
+    return bob;
   },
 }));
