@@ -299,36 +299,6 @@ CREATE TABLE IF NOT EXISTS columns (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Replicants: registered agent connector instances (Phase 2+)
--- Table included in schema for continuity; not exposed via API in Phase 1.
-CREATE TABLE IF NOT EXISTS replicants (
-  id         TEXT PRIMARY KEY,
-  name       TEXT NOT NULL UNIQUE,
-  harness    TEXT NOT NULL,              -- copilot-bridge | claude-code | subprocess | a2a | acp
-  config     TEXT NOT NULL DEFAULT '{}', -- harness-specific JSON config
-  status     TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
-  metadata   TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Runs: one Replicant invocation against a Thread (Phase 2+)
--- Table included in schema for continuity; not exposed via API in Phase 1.
-CREATE TABLE IF NOT EXISTS runs (
-  id           TEXT PRIMARY KEY,
-  thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-  replicant_id TEXT NOT NULL REFERENCES replicants(id) ON DELETE RESTRICT,
-  status       TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
-  input        TEXT NOT NULL DEFAULT '',
-  output       TEXT,
-  error        TEXT,
-  started_at   TEXT,
-  completed_at TEXT,
-  metadata     TEXT NOT NULL DEFAULT '{}',
-  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 -- Threads: unit of work (Phase 1) and persistent agent session (Phase 2+)
 CREATE TABLE IF NOT EXISTS threads (
   id            TEXT PRIMARY KEY,
@@ -380,6 +350,36 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   metadata           TEXT NOT NULL DEFAULT '{}',
   created_at         TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Replicants: registered agent connector instances (Phase 2+)
+-- Table included in schema for continuity; not exposed via API in Phase 1.
+CREATE TABLE IF NOT EXISTS replicants (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  harness    TEXT NOT NULL,              -- copilot-bridge | claude-code | subprocess | a2a | acp
+  config     TEXT NOT NULL DEFAULT '{}', -- harness-specific JSON config
+  status     TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
+  metadata   TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Runs: one Replicant invocation against a Thread (Phase 2+)
+-- Table included in schema for continuity; not exposed via API in Phase 1.
+CREATE TABLE IF NOT EXISTS runs (
+  id           TEXT PRIMARY KEY,
+  thread_id    TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  replicant_id TEXT NOT NULL REFERENCES replicants(id) ON DELETE RESTRICT,
+  status       TEXT NOT NULL DEFAULT 'created', -- created | queued | running | completed | failed | cancelled
+  input        TEXT NOT NULL DEFAULT '',
+  output       TEXT,
+  error        TEXT,
+  started_at   TEXT,
+  completed_at TEXT,
+  metadata     TEXT NOT NULL DEFAULT '{}',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Indexes
@@ -439,7 +439,6 @@ Local accounts only. JWT (JSON Web Tokens) for session management. Future: GitHu
 - JWT payload claims: `{ sub: <userId>, username: <username>, iat: <issued-at>, exp: <expiry> }`. The `sub` claim is the user's `id`. `GET /api/auth/me` queries the database using `sub` rather than deserialising user fields from the token — this ensures PATCH /api/auth/me changes are reflected immediately without re-login.
 - Auth middleware attaches `request.user` as `{ id: string, username: string }` (decoded from JWT sub + username claims, not a DB lookup on every request).
 - All protected endpoints require `Authorization: Bearer <token>` header.
-- `GET /api/auth/me` returns the current user decoded from the token.
 - `POST /api/auth/logout` is a client-side operation (discard token); no server-side blocklist in Phase 1.
 
 ### Public Endpoints (no auth required)
@@ -710,7 +709,7 @@ All endpoints return JSON. Error responses: `{ error: string, code?: string }`. 
 |--------|------|-------------|
 | `POST` | `/api/auth/register` | Create user account. Body: `{ username, email, password, display_name? }` |
 | `POST` | `/api/auth/login` | Login. Body: `{ username, password }`. Returns: `{ token, user }` |
-| `GET` | `/api/auth/me` | Get current user from JWT. Auth required. |
+| `GET` | `/api/auth/me` | Get current user. Queries DB from JWT `sub` claim. Auth required. |
 | `PATCH` | `/api/auth/me` | Update own `display_name`, `avatar_url`, or `password`. Auth required. |
 | `POST` | `/api/auth/logout` | Client-side operation. Server returns 204. No server-side token blocklist in Phase 1. Client must discard the token. Auth required. |
 
