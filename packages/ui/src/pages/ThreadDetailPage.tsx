@@ -6,6 +6,7 @@ import { useBobsStore } from '@/stores/bobs';
 import { ThreadStatusBadge } from '@/components/thread/ThreadStatusBadge';
 import { RunStatusBadge } from '@/components/run/RunStatusBadge';
 import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
+import { BobSelector } from '@/components/bob/BobSelector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -130,27 +131,11 @@ export function ThreadDetailPage() {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Assigned Bob</label>
-            <Select
-              value={selected.bob_id ?? '__none__'}
-              onValueChange={(val) =>
-                threadId && update(threadId, { bob_id: val === '__none__' ? null : val })
-              }
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="No bob assigned" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
-                {bobs.map((bob) => (
-                  <SelectItem key={bob.id} value={bob.id}>
-                    <span className="flex items-center gap-2">
-                      <BobStatusIndicator status={bob.status} />
-                      {bob.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <BobSelector
+              value={selected.bob_id}
+              onChange={(val) => threadId && update(threadId, { bob_id: val })}
+              bobs={bobs}
+            />
           </div>
         </div>
 
