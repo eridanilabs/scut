@@ -90,7 +90,7 @@ export function ProjectsPage() {
           {projects.map((project) => (
             <Card
               key={project.id}
-              className="cursor-pointer transition-shadow hover:shadow-md"
+              className="cursor-pointer gap-3 border border-border/70 shadow-sm transition-colors hover:bg-accent/40"
               onClick={() => navigate(`/projects/${project.id}`)}
               role="button"
               tabIndex={0}
@@ -102,6 +102,9 @@ export function ProjectsPage() {
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {project.description || 'No description.'}
+                </p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {new Date(project.created_at).toLocaleDateString()}
                 </p>
               </CardContent>
             </Card>

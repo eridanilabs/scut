@@ -9,6 +9,7 @@ import { ThreadCard } from '@/components/thread/ThreadCard';
 import { ThreadForm } from '@/components/thread/ThreadForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { ErrorState } from '@/components/ErrorState';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Column, Thread, Bob } from '@/api/types';
@@ -37,15 +38,21 @@ function BoardColumn({ column, threads, bobs, onThreadClick }: BoardColumnProps)
   const bobMap = Object.fromEntries(bobs.map((b) => [b.id, b]));
 
   return (
-    <div className="flex w-72 flex-shrink-0 flex-col gap-2 rounded-lg border bg-muted/30 p-3">
-      <div className="flex items-center justify-between pb-1">
+    <div className="flex h-full min-w-[280px] w-[280px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors sm:w-72 md:snap-none">
+      <div className="border-b px-4 py-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{column.name}</h3>
-        <span className="text-xs text-muted-foreground">{columnThreads.length}</span>
+        <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+          {columnThreads.length}
+        </span>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-2 pr-2">
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+        <div className="min-w-0 space-y-3 p-3">
           {columnThreads.length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">No threads</p>
+            <Card className="border border-dashed border-border/80 bg-background/60 shadow-none">
+              <CardContent className="flex items-center justify-center py-6">
+                <p className="text-xs text-muted-foreground">No threads</p>
+              </CardContent>
+            </Card>
           ) : (
             columnThreads.map((thread) => (
               <ThreadCard
@@ -101,8 +108,8 @@ export function MootPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col gap-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b">
         <div>
           <h2 className="text-xl font-bold">{project?.name ?? 'Board'}</h2>
           {project?.description && (
@@ -115,7 +122,7 @@ export function MootPage() {
       </div>
 
       {loading ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain p-4 pb-2 md:snap-none">
           {Array.from({ length: 4 }).map((_, i) => (
             <ColumnSkeleton key={i} />
           ))}
@@ -125,7 +132,7 @@ export function MootPage() {
           <p>No board configured for this project.</p>
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain p-4 pb-2 md:snap-none">
           {columns
             .filter((c) => boards.some((b) => b.id === c.board_id && b.project_id === projectId))
             .map((column) => (

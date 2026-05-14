@@ -1,4 +1,4 @@
-import { LayoutDashboard, Bot, X } from 'lucide-react';
+import { LayoutDashboard, Bot, X, Layers } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden w-56 flex-col border-r bg-sidebar md:flex">
-        <div className="flex h-14 items-center border-b px-4">
+        <div className="flex h-14 items-center border-b px-4 gap-2">
+          <Layers className="h-5 w-5 shrink-0" />
           <span className="text-lg font-bold tracking-tight">Scut</span>
         </div>
         <NavLinks />
@@ -65,7 +66,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       {/* Mobile sheet */}
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose()}>
         <SheetContent side="left" className="w-56 p-0">
-          <div className="flex h-14 items-center border-b px-4">
+          <div className="flex h-14 items-center border-b px-4 gap-2">
+            <Layers className="h-5 w-5 shrink-0" />
             <span className="flex-1 text-lg font-bold tracking-tight">Scut</span>
             <button onClick={onMobileClose} className="rounded p-1 hover:bg-accent">
               <X className="h-4 w-4" />

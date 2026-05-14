@@ -2,29 +2,32 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { ThreadStatus } from '@/api/types';
 
+const statusClassMap: Record<ThreadStatus, string> = {
+  idea: 'border-dashed text-muted-foreground',
+  refining: 'bg-secondary text-secondary-foreground',
+  ready: 'bg-emerald-600 text-white hover:bg-emerald-600',
+  in_progress: 'bg-sky-600 text-white hover:bg-sky-600',
+  blocked: 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200',
+  done: 'border-emerald-300 text-emerald-700 dark:border-emerald-500/40 dark:text-emerald-300',
+  archived: 'text-muted-foreground',
+};
+
+function formatStatus(status: ThreadStatus): string {
+  return status.split('_').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
 interface ThreadStatusBadgeProps {
   status: ThreadStatus;
   className?: string;
 }
 
-const STATUS_CONFIG: Record<ThreadStatus, { label: string; className: string }> = {
-  idea: { label: 'Idea', className: 'bg-secondary text-secondary-foreground' },
-  refining: { label: 'Refining', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  ready: { label: 'Ready', className: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
-  in_progress: { label: 'In Progress', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-  blocked: { label: 'Blocked', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
-  done: { label: 'Done', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-  archived: { label: 'Archived', className: 'bg-muted text-muted-foreground' },
-};
-
 export function ThreadStatusBadge({ status, className }: ThreadStatusBadgeProps) {
-  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.idea;
   return (
     <Badge
       variant="outline"
-      className={cn('border-transparent text-xs font-medium', config.className, className)}
+      className={cn('shrink-0 capitalize', statusClassMap[status], className)}
     >
-      {config.label}
+      {formatStatus(status)}
     </Badge>
   );
 }

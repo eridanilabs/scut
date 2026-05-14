@@ -94,7 +94,7 @@ export function ThreadDetailPage() {
   return (
     <div className="flex h-full flex-col gap-4 md:flex-row">
       {/* Left panel - thread info */}
-      <aside className="flex flex-col gap-4 md:w-72 md:flex-shrink-0">
+      <aside className="rounded-xl border bg-card p-4 flex flex-col gap-4 md:w-72 md:flex-shrink-0">
         <div>
           <h2 className="text-lg font-semibold leading-snug">{selected.title}</h2>
           {selected.description && (
@@ -184,8 +184,9 @@ export function ThreadDetailPage() {
 
       {/* Right panel - messages */}
       <div className="flex flex-1 flex-col gap-3 overflow-hidden">
-        <ScrollArea className="flex-1 rounded-md border bg-muted/10 p-4">
-          <div className="flex flex-col gap-3">
+        <ScrollArea className="flex-1 rounded-xl border bg-muted/10" >
+          <div className="p-4">
+            <div className="flex flex-col gap-3">
             {messages.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No messages yet. Send one to start the thread.
@@ -212,10 +213,10 @@ export function ThreadDetailPage() {
                   >
                     <div
                       className={cn(
-                        'max-w-[80%] rounded-xl px-4 py-2 text-sm',
+                        'max-w-[80%] rounded-2xl px-4 py-2 text-sm',
                         isHuman
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-foreground',
+                          ? 'rounded-br-sm bg-primary text-primary-foreground'
+                          : 'rounded-bl-sm bg-muted text-foreground',
                       )}
                     >
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -232,9 +233,10 @@ export function ThreadDetailPage() {
             )}
             <div ref={messagesEndRef} />
           </div>
+          </div>
         </ScrollArea>
 
-        <form onSubmit={handleSend} className="flex gap-2">
+        <form onSubmit={handleSend} className="rounded-xl border bg-card p-3 flex gap-2">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
