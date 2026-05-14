@@ -23,22 +23,6 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
   const navigate = useNavigate();
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
-  const toggleBtn = (
-    <Tooltip>
-      <TooltipTrigger
-        className="size-11 rounded-lg flex items-center justify-center transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        onClick={toggleSidebar}
-      >
-        {collapsed
-          ? <PanelLeftOpen className="size-4 shrink-0" />
-          : <PanelLeftClose className="size-4 shrink-0" />
-        }
-      </TooltipTrigger>
-      <TooltipContent side="right">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</TooltipContent>
-    </Tooltip>
-  );
-
   return (
     <div
       className={cn(
@@ -104,9 +88,25 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         </div>
       </ScrollArea>
 
-      {/* Toggle button - always at bottom, same position in both states */}
-      <div className={cn('py-2 flex', collapsed ? 'justify-center' : 'px-2')}>
-        {toggleBtn}
+      {/* Toggle button - always at bottom, icon aligned with nav icons */}
+      <div className={cn('py-2 flex flex-col', collapsed ? 'items-center' : 'px-2')}>
+        <Tooltip>
+          <TooltipTrigger
+            className={cn(
+              'flex items-center rounded-lg transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+              collapsed ? 'size-11 justify-center' : 'min-h-10 gap-2.5 px-2.5 py-2 w-full',
+            )}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={toggleSidebar}
+          >
+            {collapsed
+              ? <PanelLeftOpen className="size-4 shrink-0" />
+              : <PanelLeftClose className="size-4 shrink-0" />
+            }
+            {!collapsed && <span className="text-sm">Collapse</span>}
+          </TooltipTrigger>
+          <TooltipContent side="right">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
