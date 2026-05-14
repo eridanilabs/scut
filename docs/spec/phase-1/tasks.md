@@ -2,6 +2,20 @@
 
 > Human-readable task list for Phase 1 MVP.
 > Agent tracking is in Beads. This file reflects current state at last agent update.
+> GitHub issue: https://github.com/eridanilabs/scut/issues/1
+
+## Beads Block IDs
+
+| Block | Beads ID | Title |
+|-------|----------|-------|
+| 1 | bill-0kg | DB layer |
+| 2 | bill-s9h | API routes |
+| 3 | bill-bjl | IBobConnector + CopilotBridgeBob |
+| 4 | bill-qhs | Seed script |
+| 5 | bill-38g | UI scaffold |
+| 6 | bill-ol2 | Moot board UI |
+| 7 | bill-anr | Thread detail UI |
+| 8 | bill-h7j | Bobs page UI |
 
 ## Status Key
 
