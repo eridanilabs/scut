@@ -9,6 +9,9 @@ packages/
       db/
         migrate.ts      - run migrations on startup
         schema.sql      - CREATE TABLE statements
+        projects.ts     - Project queries
+        boards.ts       - Board queries
+        columns.ts      - Column queries
         bobs.ts         - Bob queries
         threads.ts      - Thread queries
         messages.ts     - Message queries
@@ -18,26 +21,34 @@ packages/
         CopilotBridgeConnector.ts - Phase 1 reference connector (copilot-bridge HTTP)
         registry.ts              - in-memory connector registry
       routes/
-        bobs.ts          - GET /api/bobs, POST /api/bobs
-        threads.ts       - CRUD /api/threads
-        messages.ts      - POST /api/threads/:id/messages
-        runs.ts          - GET /api/threads/:id/runs
+        projects.ts      - CRUD /api/projects
+        boards.ts        - CRUD /api/projects/:id/boards, /api/boards/:id
+        columns.ts       - CRUD /api/boards/:id/columns, /api/columns/:id
+        bobs.ts          - GET/POST /api/bobs, GET/PATCH/DELETE /api/bobs/:id
+        threads.ts       - CRUD /api/projects/:id/threads, /api/threads/:id
+        messages.ts      - GET/POST /api/threads/:id/messages
+        runs.ts          - GET /api/threads/:id/runs, POST/DELETE /api/runs/:id
         internal.ts      - POST /api/internal/runs/:id/result
-      seed.ts            - seed a default Bob connector for local dev
+      openapi.ts         - OpenAPI 3.1 schema generation + /api/docs route
+      seed.ts            - seed a default project, board, and Bob for local dev
       index.ts           - Fastify app init, plugin registration, server start
 
-  ui/                   - React + Vite Moot board
+  ui/                   - React + Vite Moot board (SPA)
     src/
       api/
         client.ts        - fetch wrapper, base URL config
+        projects.ts      - project API calls
+        boards.ts        - board API calls
         threads.ts       - thread API calls
         bobs.ts          - bob API calls
         messages.ts      - message API calls
         runs.ts          - run API calls
       stores/
+        projects.ts      - zustand project store
+        boards.ts        - zustand board store
         threads.ts       - zustand thread store
         bobs.ts          - zustand bob store
-        ui.ts            - zustand UI state (selected thread, modals)
+        ui.ts            - zustand UI state (selected project/board/thread, modals)
       components/
         layout/          - AppShell, Sidebar, Header (from kanban)
         ui/              - shadcn/ui primitives (from kanban)
@@ -45,9 +56,10 @@ packages/
         bob/             - BobBadge, BobStatusIndicator
         run/             - RunStatus, RunHistoryItem
       pages/
-        MootPage.tsx     - main board: thread list by status
+        ProjectsPage.tsx      - project list and creation
+        MootPage.tsx          - board view: threads grouped into columns
         ThreadDetailPage.tsx  - thread messages + run history
-        BobsPage.tsx     - registered bobs and status
+        BobsPage.tsx          - registered bobs and status
       App.tsx
       main.tsx
 ```
@@ -58,7 +70,7 @@ The work follows a strict backend-first, then frontend order. Each block is inde
 
 ### Block 1: DB Layer
 
-- `schema.sql` matching the spec data model (bobs, threads, messages, runs)
+- `schema.sql` matching the full spec data model: projects, boards, columns, bobs, threads, messages, runs
 - `migrate.ts`: reads schema.sql, runs on startup, idempotent
 - Query modules: typed wrappers for insert/select/update on each table
 - No ORM. better-sqlite3 only.
@@ -66,13 +78,19 @@ The work follows a strict backend-first, then frontend order. Each block is inde
 ### Block 2: API Routes
 
 Build routes in dependency order:
-1. `/api/bobs` - GET (list), POST (register)
-2. `/api/threads` - GET (list + filters), POST, GET /:id, PATCH /:id, DELETE /:id
-3. `/api/threads/:id/messages` - POST (with auto-dispatch logic)
-4. `/api/threads/:id/runs` - GET
-5. `/api/internal/runs/:id/result` - POST (connector callback)
+1. `/api/projects` - CRUD
+2. `/api/projects/:id/boards`, `/api/boards/:id` - CRUD
+3. `/api/boards/:id/columns`, `/api/columns/:id` - CRUD
+4. `/api/bobs` - GET (list), POST (register), GET/:id, PATCH/:id, DELETE/:id
+5. `/api/projects/:id/threads` - GET (list + filters), POST
+6. `/api/threads/:id` - GET, PATCH, DELETE
+7. `/api/threads/:id/messages` - GET, POST (with auto-dispatch logic)
+8. `/api/threads/:id/runs` - GET
+9. `/api/internal/runs/:id/result` - POST (connector callback)
 
 All routes return JSON. Validation via Fastify JSON schema (no zod in Phase 1).
+
+`/api/docs` serves the OpenAPI 3.1 spec (generated from Fastify route schemas). The spec is also written to `docs/api/openapi.yaml` at build time.
 
 Auto-dispatch logic (in POST /api/threads/:id/messages):
 - If thread has a `bob_id` and message `author` is `human`
@@ -103,7 +121,7 @@ Connector registry: a `Map<bobId, IReplicantConnector>` initialized at startup. 
 
 ### Block 4: Seed Script
 
-`seed.ts`: upserts a default Bob (id=`default`, harness=`copilot-bridge`) using env vars for config. Run automatically in dev if no Bobs exist. Documents the required env vars. The harness type in the seed is configurable - changing it to a different connector type requires only env var changes, not code changes.
+`seed.ts`: upserts a default project, board with standard columns, and a default Bob (harness=`copilot-bridge`) using env vars for config. Run automatically in dev if no data exists. The harness type in the seed is configurable - changing it requires only env var changes, not code changes.
 
 ### Block 5: UI Scaffold (borrow from kanban)
 
@@ -117,11 +135,16 @@ Port from `raykao/copilot-bridge-kanban`:
 
 Replace TanStack Query with fetch + zustand. No `@tanstack/react-query` dependency.
 
-### Block 6: Moot Board (Thread List)
+### Block 6: Moot Board (Project + Board View)
+
+`ProjectsPage.tsx`:
+- Loads projects via `GET /api/projects`
+- Lists projects with name, description, thread count
+- Create project button -> modal
 
 `MootPage.tsx`:
-- Loads threads via `GET /api/threads`
-- Displays threads grouped by status column (idea, refining, ready, in_progress, blocked, done)
+- Loads a single board (with columns) and the project's threads
+- Displays threads grouped by column (each column's filter_rule determines which threads appear)
 - ThreadCard shows: title, status badge, assigned Bob name, message count
 - Create thread button -> modal with title + description form
 - Click thread -> navigate to `/threads/:id`
@@ -153,6 +176,7 @@ Replace TanStack Query with fetch + zustand. No `@tanstack/react-query` dependen
 | DB | better-sqlite3 (sync) | Simple, no async complexity for Phase 1 |
 | Validation | Fastify JSON schema | Lightweight, no extra deps |
 | Auth | None | Out of scope for Phase 1 |
+| API documentation | OpenAPI 3.1 via Fastify schema | API-first; agents and humans share the same docs |
 | Styling | Tailwind CSS v4 + shadcn/ui | Borrowed from kanban |
 
 ## Environment Variables (server)
