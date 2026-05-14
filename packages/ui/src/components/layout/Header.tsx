@@ -2,6 +2,7 @@ import { Menu, Monitor, Moon, Sun } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { type ThemeMode, useThemeStore } from '@/stores/theme';
 
@@ -50,16 +51,13 @@ export function Header({ onOpenMobileNav }: HeaderProps) {
 
       <div className="flex items-center gap-2 sm:gap-3">
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              className="size-11"
-              onClick={() => setTheme(nextMode)}
-              type="button"
-              variant="ghost"
-            >
-              <ThemeIcon className="size-4" />
-              <span className="sr-only">{`Theme: ${themeLabelMap[mode]}. Switch to ${themeLabelMap[nextMode]}.`}</span>
-            </Button>
+          <TooltipTrigger
+            className="inline-flex size-11 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onClick={() => setTheme(nextMode)}
+            type="button"
+          >
+            <ThemeIcon className="size-4" />
+            <span className="sr-only">{`Theme: ${themeLabelMap[mode]}. Switch to ${themeLabelMap[nextMode]}.`}</span>
           </TooltipTrigger>
           <TooltipContent>{`Switch to ${themeLabelMap[nextMode]}`}</TooltipContent>
         </Tooltip>
