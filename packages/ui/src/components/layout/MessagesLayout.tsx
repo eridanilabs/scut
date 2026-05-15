@@ -8,7 +8,7 @@ import { ChatPanel } from '@/pages/messages/ChatPanel';
 const navItems = [
   { icon: LayoutDashboard, label: 'Projects', href: '/' },
   { icon: MessageSquare, label: 'Messages', href: '/messages' },
-  { icon: Bot, label: 'Replicants', href: '/bobs' },
+  { icon: Bot, label: 'Replicants', href: '/replicants' },
 ] as const;
 
 function isNavActive(pathname: string, href: string): boolean {

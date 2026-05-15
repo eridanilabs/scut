@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Bot, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBobsStore } from '@/stores/bobs';
-import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
+import { useReplicantsStore } from '@/stores/replicants';
+import { ReplicantStatusIndicator } from '@/components/replicant/ReplicantStatusIndicator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ function AddReplicantDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const create = useBobsStore((s) => s.create);
+  const create = useReplicantsStore((s) => s.create);
   const [name, setName] = useState('');
   const [harness, setHarness] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -78,7 +78,7 @@ function AddReplicantDialog({
             <Label htmlFor="rep-name">Name</Label>
             <Input
               id="rep-name"
-              placeholder="e.g. Bob"
+              placeholder="e.g. Replicant"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -110,8 +110,8 @@ function AddReplicantDialog({
   );
 }
 
-export function BobsPage() {
-  const { bobs, loading, error, fetch } = useBobsStore();
+export function ReplicantsPage() {
+  const { replicants, loading, error, fetch } = useReplicantsStore();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -144,7 +144,7 @@ export function BobsPage() {
 
       {loading ? (
         <TableSkeleton />
-      ) : bobs.length === 0 ? (
+      ) : replicants.length === 0 ? (
         <p className="text-sm text-muted-foreground">No replicants configured.</p>
       ) : (
         <div className="rounded-md border">
@@ -158,22 +158,22 @@ export function BobsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bobs.map((bob) => (
-                <TableRow key={bob.id}>
-                  <TableCell className="font-medium">{bob.name}</TableCell>
+              {replicants.map((replicant) => (
+                <TableRow key={replicant.id}>
+                  <TableCell className="font-medium">{replicant.name}</TableCell>
                   <TableCell>
                     <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                      {bob.harness}
+                      {replicant.harness}
                     </code>
                   </TableCell>
                   <TableCell>
                     <span className="flex items-center gap-2 text-sm">
-                      <BobStatusIndicator status={bob.status} />
-                      <span className="capitalize">{bob.status}</span>
+                      <ReplicantStatusIndicator status={replicant.status} />
+                      <span className="capitalize">{replicant.status}</span>
                     </span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(bob.created_at).toLocaleDateString()}
+                    {new Date(replicant.created_at).toLocaleDateString()}
                   </TableCell>
                 </TableRow>
               ))}

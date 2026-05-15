@@ -12,8 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { threadsApi } from '@/api/threads';
-import { useBobsStore } from '@/stores/bobs';
-import { BobSelector } from '@/components/bob/BobSelector';
+import { useReplicantsStore } from '@/stores/replicants';
+import { ReplicantSelector } from '@/components/replicant/ReplicantSelector';
 import type { Thread } from '@/api/types';
 
 interface ThreadFormProps {
@@ -27,12 +27,12 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [bobId, setBobId] = useState<string | null>(null);
-  const { bobs, fetch: fetchBobs } = useBobsStore();
+  const [replicantId, setReplicantId] = useState<string | null>(null);
+  const { replicants, fetch: fetchReplicants } = useReplicantsStore();
 
   useEffect(() => {
-    fetchBobs();
-  }, [fetchBobs]);
+    fetchReplicants();
+  }, [fetchReplicants]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +43,12 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
         project_id: projectId,
         title: title.trim(),
         description: description.trim(),
-        bob_id: bobId,
+        replicant_id: replicantId,
       });
       onCreated(thread);
       setTitle('');
       setDescription('');
-      setBobId(null);
+      setReplicantId(null);
       onOpenChange(false);
     } catch (err) {
       toast.error('Failed to create thread');
@@ -87,8 +87,8 @@ export function ThreadForm({ open, onOpenChange, projectId, onCreated }: ThreadF
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="thread-bob">Assigned Bob</Label>
-            <BobSelector value={bobId} onChange={setBobId} bobs={bobs} />
+            <Label htmlFor="thread-replicant">Assigned Replicant</Label>
+            <ReplicantSelector value={replicantId} onChange={setReplicantId} replicants={replicants} />
           </div>
           <DialogFooter>
             <Button

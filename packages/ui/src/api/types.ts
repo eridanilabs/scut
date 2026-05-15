@@ -15,9 +15,9 @@ export type RunStatus =
   | 'failed'
   | 'cancelled';
 
-export type BobStatus = 'online' | 'offline' | 'busy' | 'unknown';
+export type ReplicantStatus = 'online' | 'offline' | 'busy' | 'unknown';
 
-export type MessageAuthor = 'human' | 'bob' | 'system';
+export type MessageAuthor = 'human' | 'replicant' | 'system';
 
 export interface Project {
   id: string;
@@ -43,18 +43,18 @@ export interface Column {
   board_id: string;
   name: string;
   position: number;
-  filter_rule: { status?: ThreadStatus; labels?: string[]; bob_id?: string };
+  filter_rule: { status?: ThreadStatus; labels?: string[]; replicant_id?: string };
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
 
-export interface Bob {
+export interface Replicant {
   id: string;
   name: string;
   harness: string;
   config: Record<string, unknown>;
-  status: BobStatus;
+  status: ReplicantStatus;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -66,7 +66,7 @@ export interface Thread {
   title: string;
   description: string;
   status: ThreadStatus;
-  bob_id: string | null;
+  replicant_id: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -86,7 +86,7 @@ export interface Message {
 export interface Run {
   id: string;
   thread_id: string;
-  bob_id: string;
+  replicant_id: string;
   status: RunStatus;
   input: string;
   output: string | null;
