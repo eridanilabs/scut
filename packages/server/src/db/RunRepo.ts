@@ -4,7 +4,7 @@ import db from './db.js';
 export type RunRow = {
   id: string;
   thread_id: string;
-  bob_id: string;
+  replicant_id: string;
   status: string;
   input: string;
   output: string | null;
@@ -26,7 +26,7 @@ export function getRun(id: string): RunRow | undefined {
 export function createRun(fields: { threadId: string; bobId: string; input: string; status?: string }): RunRow {
   const id = nanoid();
   const status = fields.status ?? 'created';
-  db.prepare('INSERT INTO runs (id, thread_id, bob_id, input, status) VALUES (?, ?, ?, ?, ?)').run(id, fields.threadId, fields.bobId, fields.input, status);
+  db.prepare('INSERT INTO runs (id, thread_id, replicant_id, input, status) VALUES (?, ?, ?, ?, ?)').run(id, fields.threadId, fields.bobId, fields.input, status);
   return getRun(id)!;
 }
 

@@ -1,13 +1,13 @@
-import { IBobConnector, BobStatus, Run, Thread } from './IBobConnector.js';
+import { IReplicantConnector, ReplicantStatus, Run, Thread } from './IReplicantConnector.js';
 
-export type CopilotBridgeBobConfig = {
+export type CopilotBridgeConnectorConfig = {
   webhookUrl: string;          // URL to POST the run to
   secret?: string;             // Optional shared secret, sent as Authorization: Bearer <secret>
-  callbackUrl: string;         // SCUT's own callback URL for the bob to post results back to
+  callbackUrl: string;         // SCUT's own callback URL for the replicant to post results back to
 };
 
-export class CopilotBridgeBob implements IBobConnector {
-  constructor(private readonly config: CopilotBridgeBobConfig) {}
+export class CopilotBridgeConnector implements IReplicantConnector {
+  constructor(private readonly config: CopilotBridgeConnectorConfig) {}
 
   async dispatch(run: Run, thread: Thread): Promise<void> {
     const payload = {
@@ -32,7 +32,7 @@ export class CopilotBridgeBob implements IBobConnector {
     });
 
     if (response.status >= 400) {
-      throw new Error(`CopilotBridgeBob dispatch failed: ${response.status}`);
+      throw new Error(`CopilotBridgeConnector dispatch failed: ${response.status}`);
     }
   }
 
@@ -41,7 +41,7 @@ export class CopilotBridgeBob implements IBobConnector {
     return;
   }
 
-  async status(): Promise<BobStatus> {
+  async status(): Promise<ReplicantStatus> {
     return { available: true, busy: false };
   }
 }
