@@ -8,6 +8,7 @@
 4. [Application Architecture](#4-application-architecture)
 5. [Data Hierarchy](#5-data-hierarchy)
 6. [Data Model](#6-data-model)
+   - [6.5 Board Types](#65-board-types)
 7. [Authentication](#7-authentication-phase-1)
 8. [Real-Time and Bidirectional Data](#8-real-time-and-bidirectional-data)
 9. [Database Adapter Interface](#9-database-adapter-interface)
@@ -48,15 +49,21 @@ Consequences:
 
 A Thread does not live inside a Column. A Thread lives on a Project and has fields (status, assignee_type, assignee_id, metadata). A Column is a saved filter rule — a JSON expression evaluated at query time. A Thread appears in a Column when its fields match the column's `filter_rule`. Moving a Thread between columns mutates the Thread's fields, not its location. A single Thread can appear in multiple columns if it matches multiple filter rules.
 
+When a Thread is moved to a column, `thread.status` is set to `column.status_label`. The column's display `name` and its `status_label` are independent fields — renaming a column does not change the status values already written to threads.
+
 ### Assignee Is Polymorphic
 
 Any entity that can be assigned (Thread, ChecklistItem) uses `assignee_type` + `assignee_id`. `assignee_type` is `'user'`, `'replicant'`, or `null`. This means the same assignment field works for human users (Phase 1) and agent connectors (Phase 2) without a schema change.
 
 ### Thread = Work Item (Phases 1+) and Agent Session (Phase 2+)
 
-A Thread is the unit of work. In Phase 1 it is a Kanban card. In Phase 2, posting a comment to a Thread with an assigned Replicant triggers a Run — the Thread's comment history becomes the session context. The data model does not change between phases; Phase 2 adds dispatch behavior on top of it.
+A Thread is the unit of work. In Phase 1 it is a Kanban card. In Phase 2, posting a comment to a Thread with an assigned Replicant triggers a Run — the Thread's comment history becomes the session context. The data model does not change between phases; Phase 2 adds dispatch behavior on top of it. See also: **Everything Is a Thread** below — a DM session with a Replicant on a `chat` board is also a Thread, using the same data model.
 
-Threads can have a `parent_id` pointing to another Thread. This is set when a ChecklistItem is promoted to a full Thread, preserving the lineage.
+Threads can have a `parent_id` pointing to another Thread. This is set when a ChecklistItem is promoted to a full Thread, preserving the lineage. It is also set on delegated child threads — see the Delegation vocabulary entry.
+
+### Everything Is a Thread
+
+Work items, agent sessions, and direct messages are all Threads. The board a Thread belongs to (and its `board_type`) determines how it is rendered in the UI and what rules apply. There is no separate `conversations` or `dm_sessions` table. A DM with a Replicant is a Thread on a `chat` board. A work item is a Thread on a `standard` or `agent_board` board. The message history and run history are the same regardless of board type.
 
 ### Checklists Are Execution Artifacts
 
@@ -86,23 +93,26 @@ Every entity carries a `metadata` JSON field. This enables filtering, custom vie
 |------|-----------|
 | **Organization** | Top-level tenant. Phase 1: single org, config only. |
 | **Project** | A named collection of Boards and Threads. Roughly equivalent to a repo or initiative. |
-| **Board** | A named view within a Project. Displays Threads organized into Columns. |
+| **Board** | A named view within a Project. Displays Threads organized into Columns. `board_type` is a discriminator field (`standard` \| `agent_board` \| `chat`) driving UI rendering and validation rules — not a structural DB difference. |
 | **Column** | A saved filter rule on a Board. Threads appear in a column when their fields match the `filter_rule`. Not a container. |
-| **Thread** | The unit of work. A card on a board in Phase 1. Gains agent session behavior in Phase 2. |
+| **Thread** | The unit of work (internal/DB name). A card on a board in Phase 1. Gains agent session behavior in Phase 2. The display label is configurable per board via `item_singular`/`item_plural` (default: "thread"/"threads"). A DM session with a Replicant on a `chat` board is also a Thread. |
+| **Card** | The UI display label for a Thread; the default value. May be customized per board (e.g., "Issue", "Work Item", "Ticket") via the board's `item_singular` field. |
 | **Comment** | One entry in a Thread's history — from a user, a Replicant, or the system. |
 | **Checklist** | An optional ordered list of ChecklistItems attached to a Thread. |
 | **ChecklistItem** | A single actionable item in a Checklist. Can have an assignee. Can be promoted to a Thread. |
 | **Run** | One invocation of a Replicant against a Thread (Phase 2+). Tracks status, input, and output. |
 | **User** | A registered human account. Auth via local credentials (username + bcrypt password) + JWT. |
 | **Assignee** | A polymorphic reference: `{ type: 'user' \| 'replicant', id: string }` or `null`. |
-| **Replicant** | A registered agent connector instance (Phase 2+). Named after Bobiverse replicants. |
-| **Moot** | The React board UI. Where humans see and manage Threads across Projects and Boards. |
+| **Replicant** | A registered agent connector instance (Phase 2+). Named after Bobiverse replicants. Once a thread's `replicant_id` is set, it is immutable — it cannot be changed. Delegation creates a new child thread. |
+| **Moot** | The React board UI. Where humans see and manage Threads across Projects and Boards. The Agent Moot view is a UI query (`WHERE replicant_id = ?`) across all boards — it is not a `board_type`, has no backing DB object, and threads shown in it belong to their home boards. |
 | **IReplicantConnector** | The harness-agnostic connector interface every Replicant adapter implements (Phase 2+). |
 | **CopilotBridgeConnector** | Phase 2 reference implementation of `IReplicantConnector` for copilot-bridge. |
 | **ClaudeCodeConnector** | Phase 4 connector for the `claude` CLI via subprocess. |
 | **SubprocessConnector** | Phase 4 generic connector for any CLI-based agent harness. |
 | **A2AConnector** | Phase 4 connector for remote agents via the Google A2A protocol. |
 | **ACPConnector** | Phase 5 connector for local agents via the IBM ACP protocol. |
+| **Checkpoint** | A saved snapshot of a Replicant's execution state at a point in time. First-class entity. Defined by `ICheckpointProvider` interface. Not all connector implementations support checkpoints. |
+| **Delegation** | The act of a Replicant creating a child Thread (with `parent_id` set) and assigning it to another Replicant. The original Thread's `replicant_id` is never changed. The parent Thread receives the result when the child completes. |
 
 The pattern: `Replicant` is the registered entity. `IReplicantConnector` is the interface. Each `*Connector` is one harness adapter.
 
@@ -248,6 +258,7 @@ All entities carry a `metadata` JSON field. Standard conventions (not enforced b
 | **ChecklistItem** | Checklist | Single actionable item. Can be promoted to Thread. |
 | **Run** | Thread | One Replicant invocation (Phase 2+). |
 | **Replicant** | Organization | Registered agent connector (Phase 2+). |
+| **Checkpoint** | Thread / Run | Saved snapshot of a Replicant's execution state (Phase 2+). |
 
 ### 6.2 SQL Schema
 
@@ -278,41 +289,56 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Boards (named views within a project)
 CREATE TABLE IF NOT EXISTS boards (
-  id          TEXT PRIMARY KEY,
-  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  metadata    TEXT NOT NULL DEFAULT '{}',
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  board_type    TEXT NOT NULL DEFAULT 'standard',  -- standard | agent_board | chat
+  item_singular TEXT NOT NULL DEFAULT 'thread',    -- display label singular, e.g. 'issue', 'work item'
+  item_plural   TEXT NOT NULL DEFAULT 'threads',   -- display label plural
+  replicant_id  TEXT REFERENCES replicants(id),    -- only set for agent_board type; scopes the board to one replicant
+  metadata      TEXT NOT NULL DEFAULT '{}',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Columns (saved filter rules on a board — not containers)
 CREATE TABLE IF NOT EXISTS columns (
-  id          TEXT PRIMARY KEY,
-  board_id    TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  position    INTEGER NOT NULL DEFAULT 0,
-  filter_rule TEXT NOT NULL DEFAULT '{}', -- JSON: { status?, assignee_type?, assignee_id?, labels?, metadata? }
-  metadata    TEXT NOT NULL DEFAULT '{}',
-  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  id           TEXT PRIMARY KEY,
+  board_id     TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  position     INTEGER NOT NULL DEFAULT 0,
+  filter_rule  TEXT NOT NULL DEFAULT '{}', -- JSON: { status?, assignee_type?, assignee_id?, labels?, metadata? }
+  status_label TEXT NOT NULL DEFAULT '',   -- value written to thread.status on move; defaults to slugified name if empty
+  metadata     TEXT NOT NULL DEFAULT '{}',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Note: `name` is the display label (user-editable). `status_label` is the canonical value written to
+-- `thread.status` when a Thread is moved to this column. They are independent: renaming the column
+-- does not update existing thread statuses. If `status_label` is empty, the server uses a slugified
+-- version of `name` as the effective status value.
 
 -- Threads: unit of work (Phase 1) and persistent agent session (Phase 2+)
 CREATE TABLE IF NOT EXISTS threads (
   id            TEXT PRIMARY KEY,
   project_id    TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  parent_id     TEXT REFERENCES threads(id) ON DELETE SET NULL, -- set when promoted from ChecklistItem
-  title         TEXT NOT NULL,
+  parent_id     TEXT REFERENCES threads(id) ON DELETE SET NULL, -- set when promoted from ChecklistItem, or for delegated child threads
+  title         TEXT NOT NULL,  -- on chat boards, defaults to ISO timestamp of creation (e.g. 2026-05-15T09:40:00Z); user may rename
   description   TEXT NOT NULL DEFAULT '',
   status        TEXT NOT NULL DEFAULT 'todo', -- todo | in_progress | blocked | done | archived
   assignee_type TEXT,                          -- 'user' | 'replicant' | null
   assignee_id   TEXT,                          -- FK to users.id or replicants.id depending on assignee_type
+  replicant_id  TEXT REFERENCES replicants(id), -- immutable once set; see Delegation principle
   metadata      TEXT NOT NULL DEFAULT '{}',
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Note: `replicant_id` is immutable once set. To delegate work, a Replicant creates a new child Thread
+-- with `parent_id` referencing the current Thread and `replicant_id` pointing to the delegate Replicant.
+-- The original Thread is never reassigned.
 
 -- Comments: conversation history on a thread
 CREATE TABLE IF NOT EXISTS comments (
@@ -390,12 +416,43 @@ CREATE INDEX IF NOT EXISTS idx_threads_project        ON threads(project_id);
 CREATE INDEX IF NOT EXISTS idx_threads_parent         ON threads(parent_id);
 CREATE INDEX IF NOT EXISTS idx_threads_status         ON threads(status);
 CREATE INDEX IF NOT EXISTS idx_threads_assignee       ON threads(assignee_type, assignee_id);
+CREATE INDEX IF NOT EXISTS idx_threads_replicant      ON threads(replicant_id);
 CREATE INDEX IF NOT EXISTS idx_comments_thread        ON comments(thread_id);
 CREATE INDEX IF NOT EXISTS idx_comments_run           ON comments(run_id);
 CREATE INDEX IF NOT EXISTS idx_checklists_thread      ON checklists(thread_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_items_list   ON checklist_items(checklist_id);
 CREATE INDEX IF NOT EXISTS idx_runs_thread            ON runs(thread_id);
 CREATE INDEX IF NOT EXISTS idx_runs_status            ON runs(status);
+
+-- Labels/tags join table (Phase 1+)
+-- Preferred over metadata.labels array for queryability and future Postgres compatibility.
+CREATE TABLE IF NOT EXISTS card_labels (
+  thread_id   TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  label       TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (thread_id, label)
+);
+CREATE INDEX IF NOT EXISTS idx_card_labels_label  ON card_labels(label);
+CREATE INDEX IF NOT EXISTS idx_card_labels_thread ON card_labels(thread_id);
+
+-- Note: Labels are queryable via JOIN. A Thread can have any number of labels.
+-- Labels are free-text strings. This is preferred over `metadata.labels` array
+-- for queryability and future Postgres compatibility.
+
+-- Checkpoints: saved snapshots of Replicant execution state (Phase 2+)
+-- Not all IReplicantConnector implementations support checkpointing.
+-- Connectors that support it implement ICheckpointProvider in addition to IReplicantConnector.
+CREATE TABLE IF NOT EXISTS checkpoints (
+  id            TEXT PRIMARY KEY,
+  thread_id     TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  run_id        TEXT REFERENCES runs(id) ON DELETE SET NULL,
+  replicant_id  TEXT NOT NULL REFERENCES replicants(id),
+  label         TEXT,              -- optional human-readable label
+  data          TEXT NOT NULL DEFAULT '{}',  -- JSON; connector-specific checkpoint payload
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_thread ON checkpoints(thread_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_run    ON checkpoints(run_id);
 ```
 
 ### 6.3 Thread Status Flow
@@ -424,9 +481,19 @@ stateDiagram-v2
     running --> failed
 ```
 
----
+### 6.5 Board Types
 
-## 7. Authentication (Phase 1)
+The `board_type` field on `boards` is a discriminator that drives UI rendering and validation rules. It is not a structural database difference — all boards share the same table.
+
+**`standard`** — A user-managed Kanban or project board. Columns represent workflow stages. Column names and `status_label` values are fully user-configurable. `item_singular` and `item_plural` are configurable. Thread `replicant_id` may be set to assign a thread to a Replicant, at which point the thread also appears in the Agent Moot view for that Replicant.
+
+**`agent_board`** — A board scoped to a single Replicant (identified by `boards.replicant_id`). Contains threads native to that Replicant (created directly for or by the agent, not sourced from another board). Columns are system-defined and locked (minimal or no user customization). Appears as a dedicated board view for that Replicant.
+
+**`chat`** — A board for direct message sessions between a user and a Replicant (or another human). Threads on a chat board are conversation sessions. Column names are locked (`active`, `archived`, `pinned`). Thread `title` defaults to the ISO timestamp the thread was created (e.g. `2026-05-15T09:40:00Z`); users may rename it. There is no separate `conversations` or `dm_sessions` table — chat DMs are threads on a `chat` board.
+
+**Agent Moot** — Not a `board_type`. A UI view that queries threads across all boards where `replicant_id = :id`. Threads shown in the moot belong to their home boards. Columns in the moot represent Replicants; rows represent threads assigned to each. Because `replicant_id` is immutable once set, the Agent Moot is a read-only cross-board view — threads cannot be reassigned by moving them in this view.
+
+---
 
 ### Model
 
@@ -607,7 +674,7 @@ packages/server/src/db/
       comments.ts           - was messages.ts
       checklists.ts         - Phase 1+
       checklist_items.ts    - Phase 1+
-      replicants.ts         - Phase 2+ (was bobs.ts)
+      replicants.ts         - Phase 2+
       runs.ts               - Phase 2+
       schema.sql            - CREATE TABLE statements
       migrate.ts            - idempotent migration runner
@@ -690,7 +757,34 @@ export interface IReplicantConnector {
 }
 ```
 
-### 10.1 Connector Contract Notes
+### 10.1 ICheckpointProvider
+
+An optional interface that connectors may implement alongside `IReplicantConnector`. Not all harnesses support checkpointing.
+
+```typescript
+export interface ICheckpointProvider {
+  /**
+   * Save a checkpoint for the given run.
+   * Returns the checkpoint ID.
+   */
+  saveCheckpoint(runId: string, threadId: string, data: Record<string, unknown>): Promise<string>;
+
+  /**
+   * Restore execution state from a checkpoint.
+   * The connector resumes the run from the saved state.
+   */
+  restoreCheckpoint(checkpointId: string): Promise<void>;
+
+  /**
+   * List checkpoints for a thread, most recent first.
+   */
+  listCheckpoints(threadId: string): Promise<Array<{ id: string; label?: string; createdAt: string }>>;
+}
+```
+
+To check at runtime: `if ('saveCheckpoint' in connector) { ... }`
+
+### 10.2 Connector Contract Notes
 
 - `dispatch` is fire-and-forget. SCUT creates the Run record before calling dispatch. The connector may update the Run status to `queued` or `running` synchronously, but the result arrives later via the callback.
 - `cancel` is best-effort. Some harnesses may not support mid-run cancellation. Connectors should set Run status to `cancelled` and resolve without throwing if cancellation is not possible.
@@ -888,13 +982,16 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 
 **Deliverables:**
 - User auth: local accounts (register, login, JWT). No OAuth in Phase 1.
-- Full data model: Project / Board / Column / Thread / Comment / Checklist / ChecklistItem
+- Full data model: Project / Board (`board_type`, `item_singular`, `item_plural`) / Column (`status_label`) / Thread / Comment / Checklist / ChecklistItem / `card_labels`
 - Thread assignee: human users only in Phase 1 (`assignee_type='user'`)
 - SQLite database with migration runner (`schema.sql` + `migrate.ts`)
 - Fastify API: all endpoints in sections 11.1–11.9 (Auth, Users, Projects, Boards, Columns, Threads, Comments, Checklists, ChecklistItems)
 - OpenAPI 3.1 spec at `/api/docs` and committed to `docs/api/openapi.yaml`
 - React SPA (Moot): login/register page, project list, board view with columns (filter-driven), thread detail with comments and checklists, assignee picker (users only)
 - Column `filter_rule` evaluation: `GET /api/columns/:id` returns threads matching the filter rule
+- `board_type` field on boards (default `standard`); `item_singular`/`item_plural` display label fields
+- `status_label` field on columns: written to `thread.status` on move; independent from display `name`
+- `card_labels` table: free-text label join table; queryable via JOIN; preferred over `metadata.labels`
 
 **Sub-phases:**
 
@@ -919,12 +1016,16 @@ Connects to a local agent via the IBM ACP (Agent Communication Protocol). Design
 - `replicants` table + `IReplicantRepository` + SQLiteRepository module
 - `runs` table + `IRunRepository` + SQLiteRepository module
 - `IReplicantConnector` interface
+- `ICheckpointProvider` interface (optional; implemented by connectors that support checkpointing)
+- `checkpoints` table + SQLiteRepository module
 - `CopilotBridgeConnector` (Phase 2 reference implementation)
 - Connector registry (`Map<replicantId, IReplicantConnector>`, initialized at startup from `replicants` table)
 - `POST /api/threads/:id/comments`: add auto-dispatch logic (if `assignee_type='replicant'`, create Run, call `connector.dispatch`)
 - `POST /api/internal/runs/:id/result` callback endpoint
 - Replicants API endpoints (11.10)
 - Runs API endpoints (11.11)
+- `chat` board type: threads as DM sessions; locked columns (`active`, `archived`, `pinned`); title defaults to ISO creation timestamp
+- Agent Moot view (UI only — not a `board_type`): queries threads WHERE `replicant_id = :id` across all boards; read-only (replicant_id is immutable once set)
 - Seed script: add a default Replicant (harness from env var, defaults to `copilot-bridge`)
 - Moot UI: assignee picker extended to include Replicants; run status badge in thread detail
 
