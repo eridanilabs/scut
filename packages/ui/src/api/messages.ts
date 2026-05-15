@@ -8,7 +8,7 @@ import {
   updateMockRun,
 } from './mock';
 
-const BOB_REPLY_DELAY = 800;
+const REPLICANT_REPLY_DELAY = 800;
 
 export const messagesApi = {
   list(threadId: string): Promise<Message[]> {
@@ -29,35 +29,35 @@ export const messagesApi = {
 
     const thread = getMockThread(threadId);
 
-    if (!thread?.bob_id) {
+    if (!thread?.replicant_id) {
       return { message: humanMessage, run: null };
     }
 
     // Create a run in 'created' status to return immediately
     const run = createMockRun({
       thread_id: threadId,
-      bob_id: thread.bob_id,
+      replicant_id: thread.replicant_id,
       status: 'created',
       input_text: content,
     });
 
-    // Simulate bob reply after delay
+    // Simulate replicant reply after delay
     setTimeout(() => {
       const completedRun = updateMockRun(run.id, threadId, {
         status: 'completed',
-        output: `Bob has processed your request: "${content.slice(0, 60)}${content.length > 60 ? '...' : ''}"`,
+        output: `Replicant has processed your request: "${content.slice(0, 60)}${content.length > 60 ? '...' : ''}"`,
         completed_at: new Date().toISOString(),
       });
 
       createMockMessage({
         thread_id: threadId,
-        author: 'bob',
+        author: 'replicant',
         content:
           completedRun?.output ??
           `I have received your message and am working on it.`,
         run_id: run.id,
       });
-    }, BOB_REPLY_DELAY);
+    }, REPLICANT_REPLY_DELAY);
 
     return { message: humanMessage, run };
   },

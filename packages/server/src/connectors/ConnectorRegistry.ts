@@ -1,12 +1,12 @@
-import { IBobConnector } from './IBobConnector.js';
+import { IReplicantConnector } from './IReplicantConnector.js';
 
-const registry = new Map<string, IBobConnector>();
+const registry = new Map<string, IReplicantConnector>();
 
-export function registerConnector(bobId: string, connector: IBobConnector): void {
+export function registerConnector(bobId: string, connector: IReplicantConnector): void {
   registry.set(bobId, connector);
 }
 
-export function getConnector(bobId: string): IBobConnector | undefined {
+export function getConnector(bobId: string): IReplicantConnector | undefined {
   return registry.get(bobId);
 }
 

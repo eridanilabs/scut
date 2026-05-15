@@ -12,10 +12,10 @@ interface ThreadsState {
   loading: boolean;
   sending: boolean;
   error: string | null;
-  fetchByProject(projectId: string, filters?: { status?: string; bob_id?: string }): Promise<void>;
+  fetchByProject(projectId: string, filters?: { status?: string; replicant_id?: string }): Promise<void>;
   fetchDetail(threadId: string): Promise<void>;
-  create(input: { project_id: string; title: string; description: string; bob_id?: string | null }): Promise<Thread>;
-  update(id: string, patch: { status?: string; bob_id?: string | null }): Promise<void>;
+  create(input: { project_id: string; title: string; description: string; replicant_id?: string | null }): Promise<Thread>;
+  update(id: string, patch: { status?: string; replicant_id?: string | null }): Promise<void>;
   sendMessage(threadId: string, content: string): Promise<void>;
 }
 
@@ -76,7 +76,7 @@ export const useThreadsStore = create<ThreadsState>((set, get) => ({
         sending: false,
       }));
 
-      // Poll for bob reply after delay
+      // Poll for replicant reply after delay
       if (run) {
         setTimeout(async () => {
           const [messages, runs] = await Promise.all([

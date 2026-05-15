@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { useProjectsStore } from '@/stores/projects';
 import { useBoardsStore } from '@/stores/boards';
 import { useThreadsStore } from '@/stores/threads';
-import { useBobsStore } from '@/stores/bobs';
+import { useReplicantsStore } from '@/stores/replicants';
 import { ThreadCard } from '@/components/thread/ThreadCard';
 import { ThreadForm } from '@/components/thread/ThreadForm';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ErrorState } from '@/components/ErrorState';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Column, Thread, Bob } from '@/api/types';
+import type { Column, Thread, Replicant } from '@/api/types';
 
 function ColumnSkeleton() {
   return (
@@ -27,15 +27,15 @@ function ColumnSkeleton() {
 interface BoardColumnProps {
   column: Column;
   threads: Thread[];
-  bobs: Bob[];
+  replicants: Replicant[];
   onThreadClick: (threadId: string) => void;
 }
 
-function BoardColumn({ column, threads, bobs, onThreadClick }: BoardColumnProps) {
+function BoardColumn({ column, threads, replicants, onThreadClick }: BoardColumnProps) {
   const columnThreads = threads.filter(
     (t) => !column.filter_rule.status || t.status === column.filter_rule.status,
   );
-  const bobMap = Object.fromEntries(bobs.map((b) => [b.id, b]));
+  const replicantMap = Object.fromEntries(replicants.map((r) => [r.id, r]));
 
   return (
     <div className="flex h-full min-w-[280px] w-[280px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border bg-muted/30 transition-colors sm:w-72 md:snap-none">
@@ -58,7 +58,7 @@ function BoardColumn({ column, threads, bobs, onThreadClick }: BoardColumnProps)
               <ThreadCard
                 key={thread.id}
                 thread={thread}
-                bob={thread.bob_id ? bobMap[thread.bob_id] : undefined}
+                replicant={thread.replicant_id ? replicantMap[thread.replicant_id] : undefined}
                 onClick={() => onThreadClick(thread.id)}
               />
             ))
@@ -76,7 +76,7 @@ export function MootPage() {
   const { projects, fetch: fetchProjects } = useProjectsStore();
   const { boards, columns, loading: boardsLoading, fetchForProject, fetchWithColumns } = useBoardsStore();
   const { threads, loading: threadsLoading, fetchByProject, create: createThread } = useThreadsStore();
-  const { bobs, fetch: fetchBobs } = useBobsStore();
+  const { replicants, fetch: fetchReplicants } = useReplicantsStore();
   const [createThreadOpen, setCreateThreadOpen] = useState(false);
 
   const project = projects.find((p) => p.id === projectId);
@@ -84,12 +84,12 @@ export function MootPage() {
   useEffect(() => {
     if (!projectId) return;
     fetchProjects();
-    fetchBobs();
+    fetchReplicants();
     fetchForProject(projectId).then(() => {
       // Will trigger board column load after boards are fetched
     });
     fetchByProject(projectId);
-  }, [projectId, fetchProjects, fetchBobs, fetchForProject, fetchByProject]);
+  }, [projectId, fetchProjects, fetchReplicants, fetchForProject, fetchByProject]);
 
   // Load columns once boards are available
   useEffect(() => {
@@ -141,7 +141,7 @@ export function MootPage() {
                 key={column.id}
                 column={column}
                 threads={threads}
-                bobs={bobs}
+                replicants={replicants}
                 onThreadClick={(id) => navigate(`/threads/${id}`)}
               />
             ))}

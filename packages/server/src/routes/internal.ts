@@ -48,8 +48,8 @@ export default async function internalRoutes(app: FastifyInstance) {
     createMessage({
       threadId: run.thread_id,
       runId: id,
-      author: 'bob',
-      authorId: run.bob_id,
+      author: 'replicant',
+      authorId: run.replicant_id,
       content: output ?? error ?? '',
     });
 

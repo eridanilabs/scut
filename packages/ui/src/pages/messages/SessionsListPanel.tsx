@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Pencil, Plus } from 'lucide-react';
 import { useDmStore } from '@/stores/dm';
-import { useBobsStore } from '@/stores/bobs';
+import { useReplicantsStore } from '@/stores/replicants';
 import { cn } from '@/lib/utils';
 
 const EMPTY_SESSIONS: never[] = [];
@@ -10,8 +10,8 @@ const EMPTY_SESSIONS: never[] = [];
 export function SessionsListPanel() {
   const { agentId, sessionId } = useParams<{ agentId: string; sessionId?: string }>();
   const navigate = useNavigate();
-  const bobs = useBobsStore(s => s.bobs);
-  const fetchBobs = useBobsStore(s => s.fetch);
+  const replicants = useReplicantsStore(s => s.replicants);
+  const fetchReplicants = useReplicantsStore(s => s.fetch);
   const sessionsMap = useDmStore(s => s.sessions);
   const sessions = agentId ? (sessionsMap[agentId] ?? EMPTY_SESSIONS) : EMPTY_SESSIONS;
   const fetchSessions = useDmStore(s => s.fetchSessions);
@@ -21,14 +21,14 @@ export function SessionsListPanel() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
-  const agent = bobs.find(b => b.id === agentId);
+  const agent = replicants.find(b => b.id === agentId);
 
   useEffect(() => {
     if (agentId) {
-      fetchBobs();
+      fetchReplicants();
       fetchSessions(agentId);
     }
-  }, [agentId, fetchBobs, fetchSessions]);
+  }, [agentId, fetchReplicants, fetchSessions]);
 
   async function handleNewSession() {
     if (!agentId) return;

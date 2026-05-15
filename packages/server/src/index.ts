@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import bobRoutes from './routes/bobs.js';
+import replicantRoutes from './routes/replicants.js';
 import threadRoutes from './routes/threads.js';
 import messageRoutes from './routes/messages.js';
 import runRoutes from './routes/runs.js';
@@ -12,7 +12,7 @@ server.get('/health', async () => {
   return { status: 'ok', service: 'scut' };
 });
 
-await server.register(bobRoutes);
+await server.register(replicantRoutes);
 await server.register(threadRoutes);
 await server.register(messageRoutes);
 await server.register(runRoutes);

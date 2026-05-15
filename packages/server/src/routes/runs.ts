@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { listRuns, getRun, createRun, updateRun } from '../db/RunRepo.js';
 import { getThread } from '../db/ThreadRepo.js';
 import { getConnector } from '../connectors/ConnectorRegistry.js';
-import { Run, Thread } from '../connectors/IBobConnector.js';
+import { Run, Thread } from '../connectors/IReplicantConnector.js';
 import { RunRow } from '../db/RunRepo.js';
 import { ThreadRow } from '../db/ThreadRepo.js';
 
@@ -10,7 +10,7 @@ function rowToRun(row: RunRow): Run {
   return {
     id: row.id,
     threadId: row.thread_id,
-    bobId: row.bob_id,
+    bobId: row.replicant_id,
     status: row.status as Run['status'],
     input: row.input,
     output: row.output,
@@ -28,7 +28,7 @@ function rowToThread(row: ThreadRow): Thread {
     title: row.title,
     description: row.description,
     status: row.status,
-    bobId: row.bob_id,
+    bobId: row.replicant_id,
     metadata: JSON.parse(row.metadata) as Record<string, unknown>,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -48,33 +48,33 @@ export default async function runRoutes(app: FastifyInstance) {
     return run;
   });
 
-  app.post<{ Params: { threadId: string }; Body: { bobId: string; input: string } }>('/api/threads/:threadId/runs', {
+  app.post<{ Params: { threadId: string }; Body: { replicantId: string; input: string } }>('/api/threads/:threadId/runs', {
     schema: {
       body: {
         type: 'object',
-        required: ['bobId', 'input'],
+        required: ['replicantId', 'input'],
         additionalProperties: false,
         properties: {
-          bobId: { type: 'string' },
+          replicantId: { type: 'string' },
           input: { type: 'string' },
         },
       },
     },
   }, async (request, reply) => {
     const { threadId } = request.params;
-    const { bobId, input } = request.body;
+    const { replicantId, input } = request.body;
 
     const thread = getThread(threadId);
     if (!thread) {
       return reply.status(404).send({ error: 'not found' });
     }
 
-    const connector = getConnector(bobId);
+    const connector = getConnector(replicantId);
     if (!connector) {
-      return reply.status(400).send({ error: 'no connector registered for bobId' });
+      return reply.status(400).send({ error: 'no connector registered for replicantId' });
     }
 
-    const runRow = createRun({ threadId, bobId, input, status: 'created' });
+    const runRow = createRun({ threadId, bobId: replicantId, input, status: 'created' });
     const run = rowToRun(runRow);
     const threadObj = rowToThread(thread);
 

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { useThreadsStore } from '@/stores/threads';
-import { useBobsStore } from '@/stores/bobs';
+import { useReplicantsStore } from '@/stores/replicants';
 import { ThreadStatusBadge } from '@/components/thread/ThreadStatusBadge';
 import { RunStatusBadge } from '@/components/run/RunStatusBadge';
-import { BobSelector } from '@/components/bob/BobSelector';
+import { ReplicantSelector } from '@/components/replicant/ReplicantSelector';
 import { ThreadStatusSelector } from '@/components/thread/ThreadStatusSelector';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -19,15 +19,15 @@ export function ThreadDetailPage() {
   const { threadId } = useParams<{ threadId: string }>();
   const { selected, messages, runs, loading, sending, error, fetchDetail, update, sendMessage } =
     useThreadsStore();
-  const { bobs, fetch: fetchBobs } = useBobsStore();
+  const { replicants, fetch: fetchReplicants } = useReplicantsStore();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!threadId) return;
     fetchDetail(threadId);
-    fetchBobs();
-  }, [threadId, fetchDetail, fetchBobs]);
+    fetchReplicants();
+  }, [threadId, fetchDetail, fetchReplicants]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -89,11 +89,11 @@ export function ThreadDetailPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Assigned Bob</label>
-            <BobSelector
-              value={selected.bob_id}
-              onChange={(val) => threadId && update(threadId, { bob_id: val })}
-              bobs={bobs}
+            <label className="text-xs font-medium text-muted-foreground">Assigned Replicant</label>
+            <ReplicantSelector
+              value={selected.replicant_id}
+              onChange={(val) => threadId && update(threadId, { replicant_id: val })}
+              replicants={replicants}
             />
           </div>
         </div>

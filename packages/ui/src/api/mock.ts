@@ -2,7 +2,7 @@ import type {
   Project,
   Board,
   Column,
-  Bob,
+  Replicant,
   Thread,
   Message,
   Run,
@@ -142,10 +142,10 @@ export const mockColumns: Column[] = [
   },
 ];
 
-export const mockBobs: Bob[] = [
+export const mockReplicants: Replicant[] = [
   {
-    id: 'bob-bridge',
-    name: 'Bridge Bob',
+    id: 'replicant-bridge',
+    name: 'Bridge Replicant',
     harness: 'copilot-bridge',
     config: { model: 'gpt-4o' },
     status: 'online',
@@ -154,8 +154,8 @@ export const mockBobs: Bob[] = [
     updated_at: PAST(3_600_000),
   },
   {
-    id: 'bob-claude',
-    name: 'Claude Bob',
+    id: 'replicant-claude',
+    name: 'Claude Replicant',
     harness: 'claude-code',
     config: { model: 'claude-3-5-sonnet' },
     status: 'offline',
@@ -172,7 +172,7 @@ export const mockThreads: Thread[] = [
     title: 'Design the API schema for thread management',
     description: 'Define REST endpoints and data shapes for thread CRUD operations.',
     status: 'done',
-    bob_id: 'bob-bridge',
+    replicant_id: 'replicant-bridge',
     metadata: {},
     created_at: PAST(86_400_000 * 6),
     updated_at: PAST(86_400_000 * 2),
@@ -183,7 +183,7 @@ export const mockThreads: Thread[] = [
     title: 'Implement Kanban board drag-and-drop',
     description: 'Add dnd-kit based drag-and-drop for moving threads between columns.',
     status: 'in_progress',
-    bob_id: 'bob-bridge',
+    replicant_id: 'replicant-bridge',
     metadata: {},
     created_at: PAST(86_400_000 * 4),
     updated_at: PAST(7_200_000),
@@ -194,7 +194,7 @@ export const mockThreads: Thread[] = [
     title: 'Set up CI pipeline for the monorepo',
     description: 'Configure GitHub Actions workflows for build, test, and lint.',
     status: 'blocked',
-    bob_id: null,
+    replicant_id: null,
     metadata: {},
     created_at: PAST(86_400_000 * 3),
     updated_at: PAST(86_400_000),
@@ -205,7 +205,7 @@ export const mockThreads: Thread[] = [
     title: 'Explore real-time message streaming via SSE',
     description: 'Investigate server-sent events for live message delivery.',
     status: 'idea',
-    bob_id: null,
+    replicant_id: null,
     metadata: {},
     created_at: PAST(86_400_000 * 2),
     updated_at: PAST(86_400_000 * 2),
@@ -216,7 +216,7 @@ export const mockThreads: Thread[] = [
     title: 'Prototype A2A agent communication protocol',
     description: 'Build a minimal working prototype of the agent-to-agent harness.',
     status: 'in_progress',
-    bob_id: 'bob-claude',
+    replicant_id: 'replicant-claude',
     metadata: {},
     created_at: PAST(86_400_000 * 2),
     updated_at: PAST(3_600_000),
@@ -227,7 +227,7 @@ export const mockThreads: Thread[] = [
     title: 'Document ACP harness configuration options',
     description: 'Write reference documentation for all ACP harness config keys.',
     status: 'idea',
-    bob_id: null,
+    replicant_id: null,
     metadata: {},
     created_at: PAST(86_400_000),
     updated_at: PAST(86_400_000),
@@ -250,8 +250,8 @@ export const mockMessages: Record<string, Message[]> = {
       id: 'msg-1-2',
       thread_id: 'thread-1',
       run_id: 'run-1-1',
-      author: 'bob',
-      author_id: 'bob-bridge',
+      author: 'replicant',
+      author_id: 'replicant-bridge',
       content:
         'Here is a proposed schema:\n\n- GET /threads - list threads\n- POST /threads - create thread\n- GET /threads/:id - get thread\n- PATCH /threads/:id - update thread\n- DELETE /threads/:id - delete thread\n\nEach thread has: id, project_id, title, description, status, bob_id, metadata, created_at, updated_at.',
       metadata: {},
@@ -271,8 +271,8 @@ export const mockMessages: Record<string, Message[]> = {
       id: 'msg-1-4',
       thread_id: 'thread-1',
       run_id: 'run-1-2',
-      author: 'bob',
-      author_id: 'bob-bridge',
+      author: 'replicant',
+      author_id: 'replicant-bridge',
       content:
         'Added:\n\n- GET /threads/:id/messages\n- POST /threads/:id/messages\n- GET /threads/:id/runs\n\nRuns are created automatically when a message is sent to a thread with an assigned bob.',
       metadata: {},
@@ -305,8 +305,8 @@ export const mockMessages: Record<string, Message[]> = {
       id: 'msg-2-2',
       thread_id: 'thread-2',
       run_id: 'run-2-1',
-      author: 'bob',
-      author_id: 'bob-bridge',
+      author: 'replicant',
+      author_id: 'replicant-bridge',
       content:
         'I recommend dnd-kit for this. It is lightweight, accessible, and works well with React. I will implement the DndContext, SortableContext, and useSortable hooks to enable column-to-column thread movement.',
       metadata: {},
@@ -326,8 +326,8 @@ export const mockMessages: Record<string, Message[]> = {
       id: 'msg-2-4',
       thread_id: 'thread-2',
       run_id: 'run-2-2',
-      author: 'bob',
-      author_id: 'bob-bridge',
+      author: 'replicant',
+      author_id: 'replicant-bridge',
       content:
         'Understood. I will wire the onDragEnd handler to call PATCH /threads/:id with the new status derived from the destination column filter_rule.',
       metadata: {},
@@ -384,8 +384,8 @@ export const mockMessages: Record<string, Message[]> = {
       id: 'msg-5-2',
       thread_id: 'thread-5',
       run_id: 'run-5-1',
-      author: 'bob',
-      author_id: 'bob-claude',
+      author: 'replicant',
+      author_id: 'replicant-claude',
       content:
         'Starting prototype. I will implement a minimal message envelope format and a simple routing layer that dispatches to registered agent handlers.',
       metadata: {},
@@ -421,7 +421,7 @@ export const mockRuns: Record<string, Run[]> = {
     {
       id: 'run-1-1',
       thread_id: 'thread-1',
-      bob_id: 'bob-bridge',
+      replicant_id: 'replicant-bridge',
       status: 'completed',
       input: 'Draft an initial API schema for thread management.',
       output: 'GET /threads, POST /threads, GET /threads/:id, PATCH /threads/:id, DELETE /threads/:id',
@@ -435,7 +435,7 @@ export const mockRuns: Record<string, Run[]> = {
     {
       id: 'run-1-2',
       thread_id: 'thread-1',
-      bob_id: 'bob-bridge',
+      replicant_id: 'replicant-bridge',
       status: 'completed',
       input: 'Add message and run sub-resources.',
       output: 'GET /threads/:id/messages, POST /threads/:id/messages, GET /threads/:id/runs',
@@ -451,7 +451,7 @@ export const mockRuns: Record<string, Run[]> = {
     {
       id: 'run-2-1',
       thread_id: 'thread-2',
-      bob_id: 'bob-bridge',
+      replicant_id: 'replicant-bridge',
       status: 'completed',
       input: 'Implement kanban drag-and-drop using dnd-kit.',
       output: 'DndContext and SortableContext setup complete.',
@@ -465,7 +465,7 @@ export const mockRuns: Record<string, Run[]> = {
     {
       id: 'run-2-2',
       thread_id: 'thread-2',
-      bob_id: 'bob-bridge',
+      replicant_id: 'replicant-bridge',
       status: 'running',
       input: 'Wire onDragEnd to PATCH /threads/:id with new status.',
       output: null,
@@ -481,7 +481,7 @@ export const mockRuns: Record<string, Run[]> = {
     {
       id: 'run-5-1',
       thread_id: 'thread-5',
-      bob_id: 'bob-claude',
+      replicant_id: 'replicant-claude',
       status: 'running',
       input: 'Build A2A prototype with message envelope and routing layer.',
       output: null,
@@ -500,7 +500,7 @@ export const mockRuns: Record<string, Run[]> = {
 const _projects: Project[] = [...mockProjects];
 const _boards: Board[] = [...mockBoards];
 const _columns: Column[] = [...mockColumns];
-const _bobs: Bob[] = [...mockBobs];
+const _replicants: Replicant[] = [...mockReplicants];
 const _threads: Thread[] = [...mockThreads];
 const _messages: Record<string, Message[]> = Object.fromEntries(
   Object.entries(mockMessages).map(([k, v]) => [k, [...v]]),
@@ -539,13 +539,13 @@ export function getMockColumns(boardId: string): Column[] {
     .sort((a, b) => a.position - b.position);
 }
 
-export function getMockBobs(): Bob[] {
-  return [..._bobs];
+export function getMockReplicants(): Replicant[] {
+  return [..._replicants];
 }
 
-export function createMockBob(input: { name: string; harness: string }): Bob {
+export function createMockReplicant(input: { name: string; harness: string }): Replicant {
   const now = new Date().toISOString();
-  const bob: Bob = {
+  const replicant: Replicant = {
     id: crypto.randomUUID(),
     name: input.name,
     harness: input.harness,
@@ -555,18 +555,18 @@ export function createMockBob(input: { name: string; harness: string }): Bob {
     created_at: now,
     updated_at: now,
   };
-  _bobs.push(bob);
-  return bob;
+  _replicants.push(replicant);
+  return replicant;
 }
 
 export function getMockThreads(
   projectId: string,
-  filters?: { status?: string; bob_id?: string },
+  filters?: { status?: string; replicant_id?: string },
 ): Thread[] {
   return _threads.filter((t) => {
     if (t.project_id !== projectId) return false;
     if (filters?.status && t.status !== filters.status) return false;
-    if (filters?.bob_id && t.bob_id !== filters.bob_id) return false;
+    if (filters?.replicant_id && t.replicant_id !== filters.replicant_id) return false;
     return true;
   });
 }
@@ -579,7 +579,7 @@ export function createMockThread(input: {
   project_id: string;
   title: string;
   description: string;
-  bob_id?: string | null;
+  replicant_id?: string | null;
 }): Thread {
   const now = new Date().toISOString();
   const thread: Thread = {
@@ -588,7 +588,7 @@ export function createMockThread(input: {
     title: input.title,
     description: input.description,
     status: 'idea',
-    bob_id: input.bob_id ?? null,
+    replicant_id: input.replicant_id ?? null,
     metadata: {},
     created_at: now,
     updated_at: now,
@@ -627,7 +627,7 @@ export function createMockMessage(input: {
     thread_id: input.thread_id,
     run_id: input.run_id ?? null,
     author: input.author,
-    author_id: input.author === 'bob' ? null : null,
+    author_id: input.author === 'replicant' ? null : null,
     content: input.content,
     metadata: {},
     created_at: new Date().toISOString(),
@@ -645,7 +645,7 @@ export function getMockRuns(threadId: string): Run[] {
 
 export function createMockRun(input: {
   thread_id: string;
-  bob_id: string;
+  replicant_id: string;
   status: 'created' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   input_text: string;
   output?: string | null;
@@ -654,7 +654,7 @@ export function createMockRun(input: {
   const run: Run = {
     id: crypto.randomUUID(),
     thread_id: input.thread_id,
-    bob_id: input.bob_id,
+    replicant_id: input.replicant_id,
     status: input.status,
     input: input.input_text,
     output: input.output ?? null,
@@ -697,7 +697,7 @@ export function formatSessionTitle(isoDate: string): string {
 export const mockDmSessions: DmSession[] = [
   {
     id: 'dm-session-1',
-    agent_id: 'bob-bridge',
+    agent_id: 'replicant-bridge',
     title: formatSessionTitle(PAST(86_400_000 * 2)),
     last_message_preview: 'Sure, I can help with that.',
     last_message_at: PAST(86_400_000 * 2),
@@ -706,7 +706,7 @@ export const mockDmSessions: DmSession[] = [
   },
   {
     id: 'dm-session-2',
-    agent_id: 'bob-bridge',
+    agent_id: 'replicant-bridge',
     title: formatSessionTitle(PAST(3_600_000)),
     last_message_preview: 'The schema looks good to me.',
     last_message_at: PAST(3_600_000),
@@ -715,7 +715,7 @@ export const mockDmSessions: DmSession[] = [
   },
   {
     id: 'dm-session-3',
-    agent_id: 'bob-claude',
+    agent_id: 'replicant-claude',
     title: formatSessionTitle(PAST(86_400_000)),
     last_message_preview: 'Let me think about that...',
     last_message_at: PAST(86_400_000),

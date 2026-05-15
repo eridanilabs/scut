@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useBobsStore } from '@/stores/bobs';
+import { useReplicantsStore } from '@/stores/replicants';
 import { dmApi } from '@/api/dm';
-import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
+import { ReplicantStatusIndicator } from '@/components/replicant/ReplicantStatusIndicator';
 import { cn } from '@/lib/utils';
 import type { DmSession } from '@/api/types';
 
 export function AgentsListPanel() {
   const { agentId } = useParams<{ agentId?: string }>();
   const navigate = useNavigate();
-  const bobs = useBobsStore(s => s.bobs);
-  const fetchBobs = useBobsStore(s => s.fetch);
+  const replicants = useReplicantsStore(s => s.replicants);
+  const fetchReplicants = useReplicantsStore(s => s.fetch);
   const [allSessions, setAllSessions] = useState<DmSession[]>([]);
 
   useEffect(() => {
-    fetchBobs();
+    fetchReplicants();
     dmApi.allSessions().then(setAllSessions);
-  }, [fetchBobs]);
+  }, [fetchReplicants]);
 
-  function getLastPreview(bobId: string): { preview: string | null; at: string | null } {
+  function getLastPreview(replicantId: string): { preview: string | null; at: string | null } {
     const agentSessions = allSessions
-      .filter(s => s.agent_id === bobId)
+      .filter(s => s.agent_id === replicantId)
       .sort((a, b) =>
         new Date(b.last_message_at ?? b.created_at).getTime() -
         new Date(a.last_message_at ?? a.created_at).getTime()
@@ -52,13 +52,13 @@ export function AgentsListPanel() {
         Messages
       </div>
       <div className="flex-1 overflow-y-auto py-2">
-        {bobs.map(bob => {
-          const { preview, at } = getLastPreview(bob.id);
-          const active = agentId === bob.id;
+        {replicants.map(replicant => {
+          const { preview, at } = getLastPreview(replicant.id);
+          const active = agentId === replicant.id;
           return (
             <button
-              key={bob.id}
-              onClick={() => navigate(`/messages/${bob.id}`)}
+              key={replicant.id}
+              onClick={() => navigate(`/messages/${replicant.id}`)}
               className={cn(
                 'flex items-center gap-3 px-3 py-3 cursor-pointer rounded-lg mx-2 w-[calc(100%-16px)] text-left',
                 active
@@ -66,10 +66,10 @@ export function AgentsListPanel() {
                   : 'hover:bg-sidebar-accent/50'
               )}
             >
-              <BobStatusIndicator status={bob.status} className="shrink-0" />
+              <ReplicantStatusIndicator status={replicant.status} className="shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-sm font-medium truncate">{bob.name}</span>
+                  <span className="text-sm font-medium truncate">{replicant.name}</span>
                   {at && (
                     <span className="text-xs text-muted-foreground shrink-0">{formatTime(at)}</span>
                   )}

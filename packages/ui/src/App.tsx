@@ -5,7 +5,7 @@ import { AppShell } from './components/layout/AppShell';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { MootPage } from './pages/MootPage';
 import { ThreadDetailPage } from './pages/ThreadDetailPage';
-import { BobsPage } from './pages/BobsPage';
+import { ReplicantsPage } from './pages/ReplicantsPage';
 import { MessagesPage } from './pages/messages/MessagesPage';
 import { LoginPage } from './pages/LoginPage';
 import { RequireAuth } from './components/layout/RequireAuth';
@@ -21,7 +21,7 @@ export function App() {
               <Route path="/" element={<ProjectsPage />} />
               <Route path="/projects/:projectId" element={<MootPage />} />
               <Route path="/threads/:threadId" element={<ThreadDetailPage />} />
-              <Route path="/bobs" element={<BobsPage />} />
+              <Route path="/replicants" element={<ReplicantsPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/messages/:agentId" element={<MessagesPage />} />
               <Route path="/messages/:agentId/:sessionId" element={<MessagesPage />} />

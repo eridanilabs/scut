@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import type { Thread, Bob } from '@/api/types';
+import type { Thread, Replicant } from '@/api/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ThreadStatusBadge } from './ThreadStatusBadge';
-import { BobBadge } from '@/components/bob/BobBadge';
+import { ReplicantBadge } from '@/components/replicant/ReplicantBadge';
 
 function timeAgo(dateString: string): string {
   const diff = Date.now() - new Date(dateString).getTime();
@@ -18,11 +18,11 @@ function timeAgo(dateString: string): string {
 
 interface ThreadCardProps {
   thread: Thread;
-  bob?: Bob;
+  replicant?: Replicant;
   onClick: () => void;
 }
 
-export function ThreadCard({ thread, bob, onClick }: ThreadCardProps) {
+export function ThreadCard({ thread, replicant, onClick }: ThreadCardProps) {
   const relativeTime = useMemo(() => timeAgo(thread.updated_at), [thread.updated_at]);
 
   return (
@@ -44,9 +44,9 @@ export function ThreadCard({ thread, bob, onClick }: ThreadCardProps) {
         </div>
       </CardHeader>
       <CardContent className="mt-auto pt-2 space-y-2">
-        {bob && (
+        {replicant && (
           <div className="flex flex-wrap gap-1.5">
-            <BobBadge bob={bob} />
+            <ReplicantBadge replicant={replicant} />
           </div>
         )}
         <div className="text-xs text-muted-foreground">{relativeTime}</div>

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "seed": "tsx src/seed-bob.ts"
+    "seed": "tsx src/seed-replicant.ts"
   },
   "dependencies": {
     "fastify": "^4.28.0",

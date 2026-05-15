@@ -1,15 +1,15 @@
-import { listBobs } from '../db/BobRepo.js';
+import { listReplicants } from '../db/ReplicantRepo.js';
 import { registerConnector } from '../connectors/ConnectorRegistry.js';
-import { CopilotBridgeBob } from '../connectors/CopilotBridgeBob.js';
+import { CopilotBridgeConnector } from '../connectors/CopilotBridgeConnector.js';
 
 export function bootstrapConnectors(): void {
-  const bobs = listBobs();
+  const replicants = listReplicants();
   let count = 0;
-  for (const bob of bobs) {
-    if (bob.harness === 'copilot-bridge' && bob.status === 'online') {
+  for (const replicant of replicants) {
+    if (replicant.harness === 'copilot-bridge' && replicant.status === 'online') {
       let config: Record<string, unknown>;
       try {
-        config = JSON.parse(bob.config) as Record<string, unknown>;
+        config = JSON.parse(replicant.config) as Record<string, unknown>;
       } catch {
         continue;
       }
@@ -17,7 +17,7 @@ export function bootstrapConnectors(): void {
       const callbackUrl = (config.callbackUrl as string | undefined) ?? 'http://localhost:3000';
       const secret = config.secret as string | undefined;
       if (!webhookUrl) continue;
-      registerConnector(bob.id, new CopilotBridgeBob({ webhookUrl, callbackUrl, secret }));
+      registerConnector(replicant.id, new CopilotBridgeConnector({ webhookUrl, callbackUrl, secret }));
       count++;
     }
   }

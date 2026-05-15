@@ -16,7 +16,7 @@ const themeIconMap = { light: Sun, dark: Moon, system: Monitor } satisfies Recor
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/') return 'Projects';
-  if (pathname === '/bobs') return 'Replicants';
+  if (pathname === '/replicants') return 'Replicants';
   if (pathname.startsWith('/projects/')) return 'Moot';
   if (pathname.startsWith('/threads/')) return 'Thread';
   return 'Scut';

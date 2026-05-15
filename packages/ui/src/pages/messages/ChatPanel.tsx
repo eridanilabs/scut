@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Send } from 'lucide-react';
 import { useDmStore } from '@/stores/dm';
-import { useBobsStore } from '@/stores/bobs';
-import { BobStatusIndicator } from '@/components/bob/BobStatusIndicator';
+import { useReplicantsStore } from '@/stores/replicants';
+import { ReplicantStatusIndicator } from '@/components/replicant/ReplicantStatusIndicator';
 import { cn } from '@/lib/utils';
 
 const EMPTY_SESSIONS: never[] = [];
@@ -12,8 +12,8 @@ const EMPTY_MESSAGES: never[] = [];
 export function ChatPanel() {
   const { agentId, sessionId } = useParams<{ agentId: string; sessionId: string }>();
   const navigate = useNavigate();
-  const bobs = useBobsStore(s => s.bobs);
-  const fetchBobs = useBobsStore(s => s.fetch);
+  const replicants = useReplicantsStore(s => s.replicants);
+  const fetchReplicants = useReplicantsStore(s => s.fetch);
   const sessionsMap = useDmStore(s => s.sessions);
   const messagesMap = useDmStore(s => s.messages);
   const sessions = agentId ? (sessionsMap[agentId] ?? EMPTY_SESSIONS) : EMPTY_SESSIONS;
@@ -31,12 +31,12 @@ export function ChatPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fetchedRef = useRef<string | null>(null);
 
-  const agent = bobs.find(b => b.id === agentId);
+  const agent = replicants.find(b => b.id === agentId);
   const session = sessions.find(s => s.id === sessionId);
 
   useEffect(() => {
-    fetchBobs();
-  }, [fetchBobs]);
+    fetchReplicants();
+  }, [fetchReplicants]);
 
   useEffect(() => {
     if (agentId) fetchSessions(agentId);
@@ -107,7 +107,7 @@ export function ChatPanel() {
       <div className="shrink-0 border-b bg-background px-6 py-3 flex items-center gap-3">
         {agent && (
           <>
-            <BobStatusIndicator status={agent.status} />
+            <ReplicantStatusIndicator status={agent.status} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{agent.name}</p>
               {session && (

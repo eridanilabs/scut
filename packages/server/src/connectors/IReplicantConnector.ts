@@ -1,12 +1,12 @@
 /**
- * IBobConnector - the contract every Bob adapter must implement.
+ * IReplicantConnector - the contract every Replicant adapter must implement.
  *
- * A Bob connector wraps a specific agent harness (copilot-bridge, Claude Code,
+ * A Replicant connector wraps a specific agent harness (copilot-bridge, Claude Code,
  * a subprocess, a remote A2A agent, etc.) and exposes a uniform interface
  * that SCUT uses to dispatch work and check health.
  */
 
-export type BobStatus = {
+export type ReplicantStatus = {
   available: boolean;
   busy: boolean;
   detail?: string;
@@ -38,7 +38,7 @@ export type Run = {
 };
 
 /**
- * IBobConnector
+ * IReplicantConnector
  *
  * Implement this interface for each agent harness type.
  * Connectors are responsible for:
@@ -46,11 +46,11 @@ export type Run = {
  *   - Reporting results back to SCUT via the internal callback endpoint
  *   - Reporting their own availability
  */
-export interface IBobConnector {
+export interface IReplicantConnector {
   /**
-   * Dispatch a run to the Bob. Fire-and-forget: the method resolves once the
+   * Dispatch a run to the Replicant. Fire-and-forget: the method resolves once the
    * run has been accepted (queued or started), not when it completes.
-   * The Bob connector is responsible for posting the result back to
+   * The Replicant connector is responsible for posting the result back to
    * POST /api/internal/runs/:id/result when done.
    */
   dispatch(run: Run, thread: Thread): Promise<void>;
@@ -62,7 +62,7 @@ export interface IBobConnector {
   cancel(runId: string): Promise<void>;
 
   /**
-   * Return the current health and availability of the Bob.
+   * Return the current health and availability of the Replicant.
    */
-  status(): Promise<BobStatus>;
+  status(): Promise<ReplicantStatus>;
 }

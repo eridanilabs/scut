@@ -10,7 +10,7 @@ import { useUiStore } from '@/stores/ui';
 const primaryNav = [
   { label: 'Projects', href: '/', icon: LayoutDashboard },
   { label: 'Messages', href: '/messages', icon: MessageSquare },
-  { label: 'Replicants', href: '/bobs', icon: Bot },
+  { label: 'Replicants', href: '/replicants', icon: Bot },
 ] as const;
 
 function isPathActive(pathname: string, href: string): boolean {
