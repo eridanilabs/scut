@@ -37,3 +37,6 @@ Thumbs.db
 # Coverage
 coverage/
 .nyc_output/
+
+# Caddy dev cache
+infra/dev/.cache/

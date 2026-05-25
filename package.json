@@ -7,10 +7,14 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspaces --if-present",
+    "dev:proxy": "concurrently -k -n server,ui,proxy -c blue,green,magenta \"npm run dev -w @scut/server\" \"npm run dev -w @scut/ui\" \"caddy run --config infra/dev/Caddyfile --adapter caddyfile\"",
     "smoke": "bash scripts/smoke.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "class-variance-authority": "^0.7.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
