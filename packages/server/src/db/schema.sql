@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS replicants (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
-  harness     TEXT NOT NULL,            -- copilot-bridge | claude-code | subprocess | a2a | acp
+  harness     TEXT NOT NULL,            -- 'acp' | 'copilot-bridge'
   config      TEXT NOT NULL DEFAULT '{}', -- JSON connector config
   status      TEXT NOT NULL DEFAULT 'unknown', -- online | offline | busy | unknown
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
