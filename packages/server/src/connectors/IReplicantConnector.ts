@@ -51,7 +51,7 @@ export interface IReplicantConnector {
    * Dispatch a run to the Replicant. Fire-and-forget: the method resolves once the
    * run has been accepted (queued or started), not when it completes.
    * The Replicant connector is responsible for posting the result back to
-   * POST /api/internal/runs/:id/result when done.
+   * POST /api/v1/internal/runs/:id/result when done.
    */
   dispatch(run: Run, thread: Thread): Promise<void>;
 

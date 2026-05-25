@@ -11,7 +11,7 @@ export default async function internalRoutes(app: FastifyInstance) {
   app.post<{
     Params: { id: string };
     Body: { status: 'completed' | 'failed'; output?: string; error?: string };
-  }>('/api/internal/runs/:id/result', {
+  }>('/internal/runs/:id/result', {
     schema: {
       body: {
         type: 'object',

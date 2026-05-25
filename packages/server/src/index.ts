@@ -12,11 +12,13 @@ server.get('/health', async () => {
   return { status: 'ok', service: 'scut' };
 });
 
-await server.register(replicantRoutes);
-await server.register(threadRoutes);
-await server.register(messageRoutes);
-await server.register(runRoutes);
-await server.register(internalRoutes);
+const API_V1_PREFIX = '/api/v1';
+
+await server.register(replicantRoutes, { prefix: API_V1_PREFIX });
+await server.register(threadRoutes, { prefix: API_V1_PREFIX });
+await server.register(messageRoutes, { prefix: API_V1_PREFIX });
+await server.register(runRoutes, { prefix: API_V1_PREFIX });
+await server.register(internalRoutes, { prefix: API_V1_PREFIX });
 
 bootstrapConnectors();
 

@@ -36,11 +36,11 @@ function rowToThread(row: ThreadRow): Thread {
 }
 
 export default async function runRoutes(app: FastifyInstance) {
-  app.get<{ Params: { threadId: string } }>('/api/threads/:threadId/runs', async (request) => {
+  app.get<{ Params: { threadId: string } }>('/threads/:threadId/runs', async (request) => {
     return listRuns(request.params.threadId);
   });
 
-  app.get<{ Params: { id: string } }>('/api/runs/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/runs/:id', async (request, reply) => {
     const run = getRun(request.params.id);
     if (!run) {
       return reply.status(404).send({ error: 'not found' });
@@ -48,7 +48,7 @@ export default async function runRoutes(app: FastifyInstance) {
     return run;
   });
 
-  app.post<{ Params: { threadId: string }; Body: { replicantId: string; input: string } }>('/api/threads/:threadId/runs', {
+  app.post<{ Params: { threadId: string }; Body: { replicantId: string; input: string } }>('/threads/:threadId/runs', {
     schema: {
       body: {
         type: 'object',
@@ -92,7 +92,7 @@ export default async function runRoutes(app: FastifyInstance) {
     return reply.status(201).send(updated);
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }> }>('/api/runs/:id', {
+  app.patch<{ Params: { id: string }; Body: Partial<{ status: string; output: string | null; error: string | null; startedAt: string | null; completedAt: string | null }> }>('/runs/:id', {
     schema: {
       body: {
         type: 'object',
