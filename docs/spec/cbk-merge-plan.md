@@ -1,12 +1,13 @@
 # CBK → SCUT Merge Plan
 
-Status: draft 3
+Status: draft 4
 Owner: bill (eridanilabs)
 Branch: `bill/docs/cbk-merge-plan`
 Related: `docs/spec/spec.md`, dark-factory `research/scut-pm-experience.md`
 
 ### Revision log
 
+- **draft 4 (2026-05-25)**: Reverse-proxy deployment topology + versioned API path (`/api/v1/...`) as part of API-first. SPA-fallback rule for the web client. API-first testability rule: every server endpoint must be exercisable via curl/REST and have a curl-based test or example **before** UI code consumes it. New §2.3 (deployment topology) and §2.4 (testability gate).
 - **draft 3 (2026-05-25)**: Elevate API-first to constraint #1 (was a SCUT spec §2 principle, not a merge-plan gate). Add §2.1 (port anti-patterns: UI-coupled endpoints, browser-only auth, render hints in transport) and §2.2 (client roadmap: web/native/mobile/CLI/agents/webhooks). UI port unit constraint added in §5.
 - **draft 2 (2026-05-25)**: Drop `Run` as a SCUT-domain entity. Adopt A2A's `Task` (typed `AgentTask` at the interface boundary) as the connector-domain word. Add `comment_dispatches` sidecar table for dispatch lifecycle; reserve `comments.metadata` for presentation hints. Reverse the "do not port" call on CBK migration 015 (drop runs) - they were right. Collapse two-field connector ID design into one opaque `connector_handle`. Rewrites: §3.1, §3.3, §3.4, §4, §5.
 - **draft 1 (2026-05-25)**: Initial nomenclature + phase plan.
@@ -29,6 +30,8 @@ Related: `docs/spec/spec.md`, dark-factory `research/scut-pm-experience.md`
    - The OpenAPI document (spec §11, `docs/api/openapi.yaml`) is the contract. UI ports of CBK code MUST result in a server endpoint first; UI work consumes that endpoint, never the other way around.
    - Auth tokens and session model work identically for browser, native, mobile, and headless clients. No browser-only cookie/CSRF coupling.
    - The packaged web UI is shipped from the API server as static assets, but is **not** required for the server to be useful. `scut-server` alone (no UI) is a valid deployment for headless / agent-only setups.
+   - **All endpoints are namespaced** under a versioned API prefix (`/api/v1/...`). See §2.3 for the deployment topology that makes web + API coexist on one origin while remaining independently deployable.
+   - **Every endpoint must be reachable and testable via `curl`** before any UI consumes it. See §2.4 for the gate.
 2. **Thread-domain IDs are separate from agent-domain IDs.** A `thread.id` is owned by SCUT. An agent-side session / task / connection identifier is owned by the connector. They are related via the opaque `connector_handle` column on the SCUT-owned `comment_dispatches` row, never by overloading one ID for both. SCUT never parses connector handles.
 3. **Bridge is unaware of SCUT's presentation choices.** Layered prompts, instruction nodes, nested comment streams, board-level system prompts - all of that is assembled by SCUT before dispatch. Connectors receive opaque prompt strings + structured context. (Carries forward the boundary from `research/bridge-authoritative-session-state.md` and `research/scut-pm-experience.md`.)
 4. **SCUT spec is the source of truth.** Where CBK and SCUT-spec disagree on naming, SCUT-spec wins unless the spec is wrong. Disagreements must result in either a spec amendment PR or a CBK→SCUT rename in the port.
@@ -60,6 +63,69 @@ The API surface must be designed assuming all of these clients will exist:
 | External integrations (webhooks in/out) | Future | Out of scope for this plan, but API must not preclude them |
 
 No code lands in this plan for non-web clients. The constraint here is **negative**: no port decision may foreclose any of these clients.
+
+### 2.3 Deployment topology: reverse proxy on a single origin
+
+To keep API-first honest **and** ship the web UI on the same `host:port` users already use, all SCUT deployments (dev, test, prod) sit behind a reverse proxy. The web client and the API server are separate processes that the proxy routes between.
+
+```
+                         ┌──────────────────────────────┐
+                         │   reverse proxy (one origin) │
+                         │   localhost:8080 / prod URL  │
+                         └──────┬────────────────┬──────┘
+                                │                │
+              path: /api/v1/*   │                │   everything else (/, /assets/*, /boards/123, ...)
+                                ▼                ▼
+                  ┌──────────────────┐  ┌──────────────────┐
+                  │  scut-server     │  │  web client      │
+                  │  (Fastify)       │  │  (Vite dev or    │
+                  │  /api/v1/...     │  │   static assets) │
+                  │  /api/docs       │  │  SPA fallback    │
+                  │  /api/events (SSE)│  │                  │
+                  │  /healthz        │  │                  │
+                  └──────────────────┘  └──────────────────┘
+```
+
+**Routing rules** (proxy config is the contract):
+
+| Path prefix | Routed to | Notes |
+|---|---|---|
+| `/api/v1/...` | `scut-server` | Versioned business API |
+| `/api/docs` | `scut-server` | OpenAPI UI + raw `openapi.yaml` |
+| `/api/events` | `scut-server` (SSE; proxy must disable buffering) | Real-time stream per spec §8 |
+| `/healthz`, `/readyz` | `scut-server` | Liveness / readiness |
+| Everything else | web client | SPA fallback to `index.html`; client-side router handles deep links |
+
+**Proxy choice**:
+
+- **Dev**: Vite's built-in proxy (`server.proxy['/api']` and `server.proxy['/healthz']` in `vite.config.ts`) is the default. Zero new processes for the common case. Pros: one command (`pnpm dev`), HMR, fast. Cons: only handles the web-client side.
+- **Dev/test (full topology)**: A tiny **Caddy** or **nginx** reverse proxy in a Compose file (`infra/dev/Caddyfile` or `nginx.dev.conf`) that sits in front of `scut-server` and either the Vite dev server (dev) or the built static assets (test). Used when we want to test the actual production topology, run multiple clients (web + curl) against one origin, or verify CORS / cookie behavior.
+- **Prod**: Caddy or nginx (operator choice). Same config shape as `infra/dev/`. The repo ships reference configs; deployers can swap in Envoy, Traefik, or anything else that honors the routing rules above.
+
+**Why a proxy and not "serve the UI from the API server"**:
+
+1. **Independent deploys later.** The web UI can ship to a CDN; the API server can scale separately. Forcing the API server to also be a static-asset server today bakes coupling we will have to undo.
+2. **Independent dev.** Frontend devs can run only the web client against a remote staging API by changing one proxy upstream. Backend devs can run only `scut-server` and exercise it with curl, no Vite, no node-modules for the UI.
+3. **Independent testing.** The API has its own test suite that hits `scut-server` directly on its bound port (no proxy). The UI has its own test suite that mocks the API or hits a separate test deployment. See §2.4.
+4. **Native/mobile/CLI clients** point straight at the API origin and never see the web UI. The proxy is the seam that lets all three classes of client coexist on one URL today and split later.
+
+**SPA fallback rule**: the web client owns all paths that do NOT begin with `/api/`, `/healthz`, `/readyz`. Unmatched routes return `index.html` with HTTP 200; the React Router handles the actual route. This is what makes deep links work, and what makes "unstopped traffic" land somewhere useful instead of 404.
+
+**Versioning rule**: All business endpoints live under `/api/v1/...`. `/api/v2/...` is reserved for breaking changes. `/api/` without a version is reserved for meta endpoints (`/api/docs`, `/api/health`) that intentionally do not version. Connector-facing endpoints (agent token auth, callbacks) are inside `/api/v1/` like everything else - they are not special.
+
+### 2.4 Testability gate: curl / REST before UI
+
+**Every server endpoint must be exercisable end-to-end via `curl` before any UI code consumes it.**
+
+The practical gates:
+
+1. **Endpoint PR sequence**: server endpoint + test + OpenAPI entry land first. UI work that consumes that endpoint is a separate PR, opened after the API PR is merged.
+2. **Test artifact**: every endpoint ships with at least one of (a) an integration test that hits the live Fastify instance over HTTP (not just the handler function), or (b) a `docs/api/examples/<endpoint>.sh` script using `curl` that demonstrates a happy-path call. Preferably both.
+3. **Smoke script**: `scripts/smoke.sh` runs a sequence of `curl` calls against a local `scut-server` and asserts the responses. Every new endpoint adds one line to this script. CI runs it against a fresh dev instance.
+4. **No "tested via the UI"** as the only validation. If the only way to know an endpoint works is to click through the React app, the endpoint is not finished.
+5. **Phases gate**: Phase 2 (foundation port) and Phase 3 (A2A connector) MUST be fully exercisable via curl before any Phase 6 (UI port) work begins. This is what "API-first" means operationally for this plan.
+
+This is the same shape as the Small Model Standard (AGENTS.md §3): the gate is binary and a Haiku-class implementer must be able to satisfy it without judgment calls.
 
 ## 3. Nomenclature: CBK ↔ SCUT
 
@@ -217,12 +283,12 @@ Each phase ends in a green CI build on SCUT main. No CBK code lands on SCUT main
 
 - Land this document.
 - One spec-amendment PR (separate) updating `docs/spec/spec.md`:
-  - §2 Design Principles (API-First): strengthen the existing principle to **constraint** status - same hard gates as merge-plan §2.1, plus the client roadmap from §2.2.
+  - §2 Design Principles (API-First): strengthen the existing principle to **constraint** status - same hard gates as merge-plan §2.1, plus the client roadmap from §2.2, the reverse-proxy + versioned-path topology from §2.3, and the curl-first testability gate from §2.4.
   - §3 Vocabulary: remove `Run` entry; add `AgentTask` (connector boundary type), `comment_dispatches` (sidecar table), `Harness` (connector kind), `connector_handle` (opaque blob).
   - §6 Data Model: remove `runs` table from entity overview + SQL schema; add `comment_dispatches` table; narrow `comments.metadata` purpose to presentation hints.
   - §10 Connector Interface: replace `Run` type with `AgentTask`/`AgentTaskHandle`; update `IReplicantConnector` signature to the shape in §4 of this plan; add `IPromptAssembler` boundary; add `events()` stream.
   - §6.4 (Run Status Flow): repurpose as `AgentTaskStatus` lifecycle, owned by the connector and surfaced via `dispatch row.status`.
-  - §11 API Surface: note that the OpenAPI doc is the contract for **all** clients (web, native, mobile, CLI, agents) - not just the bundled React UI.
+  - §11 API Surface: rename all routes to `/api/v1/...`; document the proxy topology; note that the OpenAPI doc is the contract for **all** clients (web, native, mobile, CLI, agents) - not just the bundled React UI.
   - Note A2A as primary connector, ACP secondary, CopilotBridge legacy.
 
 ### Phase 1 - Repo and branch setup
@@ -230,12 +296,16 @@ Each phase ends in a green CI build on SCUT main. No CBK code lands on SCUT main
 - New long-lived integration branch on SCUT: `integration/cbk-merge`.
 - Bill's worktrees feed into this branch. Sub-branches per port unit (one row in the table above per branch).
 - CI runs full suite on `integration/cbk-merge` on every push.
-- Merges to `main` happen only when an integration milestone (group of port units) is fully green.
+- **Reverse-proxy dev topology**: add `infra/dev/` with a minimal Caddy or nginx config that fronts `scut-server` on `/api/v1/*` and the Vite dev server on everything else. Document `pnpm dev:proxy` as the alternate entrypoint.
+- **API versioning**: rename existing routes from `/api/...` to `/api/v1/...`. Update OpenAPI doc. Add `/api/docs` for OpenAPI UI.
+- **Smoke script**: create `scripts/smoke.sh` with the current Phase 1 endpoints. Every subsequent port unit adds to it.
+- Merges to `main` happen only when an integration milestone (group of port units) is fully green AND the smoke script passes against a fresh instance.
 
 ### Phase 2 - Foundation port (units 1-4)
 
 - Replicants table, replicant tokens, permissions, harness enum incl. `a2a`.
 - No connector code yet. Just the data + admin endpoints under SCUT vocabulary.
+- **API-first gate**: every new endpoint added in this phase ships with a curl example in `docs/api/examples/` and a line in `scripts/smoke.sh`.
 
 ### Phase 3 - A2A connector (new)
 
