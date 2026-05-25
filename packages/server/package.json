@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "seed": "tsx src/seed-replicant.ts"
+    "seed": "tsx src/seed-replicant.ts",
+    "test": "node --import tsx --test test/routes/*.test.ts"
   },
   "dependencies": {
     "fastify": "^4.28.0",
