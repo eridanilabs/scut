@@ -1,12 +1,13 @@
 # CBK → SCUT Merge Plan
 
-Status: draft 2
+Status: draft 3
 Owner: bill (eridanilabs)
 Branch: `bill/docs/cbk-merge-plan`
 Related: `docs/spec/spec.md`, dark-factory `research/scut-pm-experience.md`
 
 ### Revision log
 
+- **draft 3 (2026-05-25)**: Elevate API-first to constraint #1 (was a SCUT spec §2 principle, not a merge-plan gate). Add §2.1 (port anti-patterns: UI-coupled endpoints, browser-only auth, render hints in transport) and §2.2 (client roadmap: web/native/mobile/CLI/agents/webhooks). UI port unit constraint added in §5.
 - **draft 2 (2026-05-25)**: Drop `Run` as a SCUT-domain entity. Adopt A2A's `Task` (typed `AgentTask` at the interface boundary) as the connector-domain word. Add `comment_dispatches` sidecar table for dispatch lifecycle; reserve `comments.metadata` for presentation hints. Reverse the "do not port" call on CBK migration 015 (drop runs) - they were right. Collapse two-field connector ID design into one opaque `connector_handle`. Rewrites: §3.1, §3.3, §3.4, §4, §5.
 - **draft 1 (2026-05-25)**: Initial nomenclature + phase plan.
 
@@ -21,10 +22,44 @@ Related: `docs/spec/spec.md`, dark-factory `research/scut-pm-experience.md`
 
 ## 2. Hard Constraints
 
-1. **Thread-domain IDs are separate from agent-domain IDs.** A `thread.id` is owned by SCUT. An agent-side session / task / connection identifier is owned by the connector. They are related via the opaque `connector_handle` column on the SCUT-owned `comment_dispatches` row, never by overloading one ID for both. SCUT never parses connector handles.
-2. **Bridge is unaware of SCUT's presentation choices.** Layered prompts, instruction nodes, nested comment streams, board-level system prompts - all of that is assembled by SCUT before dispatch. Connectors receive opaque prompt strings + structured context. (Carries forward the boundary from `research/bridge-authoritative-session-state.md` and `research/scut-pm-experience.md`.)
-3. **SCUT spec is the source of truth.** Where CBK and SCUT-spec disagree on naming, SCUT-spec wins unless the spec is wrong. Disagreements must result in either a spec amendment PR or a CBK→SCUT rename in the port.
-4. **No bespoke `copilot-bridge` channel in the long run.** The existing custom WS adapter becomes one optional connector (`CopilotBridgeConnector`, already named in spec §3) that we keep for migration, not extend.
+1. **API-first is non-negotiable.** Every entity, capability, and state transition in SCUT is reachable via the public HTTP API. The React web UI shipped in this repo is **one client among many** - a native desktop app (Tauri/Electron), a mobile app (iOS/Android), a CLI, and external agents must all be able to do **everything the web UI can do** by calling the same documented API. Practical gates derived from this constraint:
+   - No business logic in UI code. The server enforces all rules; the UI renders results.
+   - No server-side endpoint exists solely to serve the React UI's convenience. If a query shape is only useful to one client, it goes in that client.
+   - All real-time updates flow through a documented, client-agnostic channel (SSE today per spec §8; not WebSocket-only, not React-specific).
+   - The OpenAPI document (spec §11, `docs/api/openapi.yaml`) is the contract. UI ports of CBK code MUST result in a server endpoint first; UI work consumes that endpoint, never the other way around.
+   - Auth tokens and session model work identically for browser, native, mobile, and headless clients. No browser-only cookie/CSRF coupling.
+   - The packaged web UI is shipped from the API server as static assets, but is **not** required for the server to be useful. `scut-server` alone (no UI) is a valid deployment for headless / agent-only setups.
+2. **Thread-domain IDs are separate from agent-domain IDs.** A `thread.id` is owned by SCUT. An agent-side session / task / connection identifier is owned by the connector. They are related via the opaque `connector_handle` column on the SCUT-owned `comment_dispatches` row, never by overloading one ID for both. SCUT never parses connector handles.
+3. **Bridge is unaware of SCUT's presentation choices.** Layered prompts, instruction nodes, nested comment streams, board-level system prompts - all of that is assembled by SCUT before dispatch. Connectors receive opaque prompt strings + structured context. (Carries forward the boundary from `research/bridge-authoritative-session-state.md` and `research/scut-pm-experience.md`.)
+4. **SCUT spec is the source of truth.** Where CBK and SCUT-spec disagree on naming, SCUT-spec wins unless the spec is wrong. Disagreements must result in either a spec amendment PR or a CBK→SCUT rename in the port.
+5. **No bespoke `copilot-bridge` channel in the long run.** The existing custom WS adapter becomes one optional connector (`CopilotBridgeConnector`, already named in spec §3) that we keep for migration, not extend.
+
+### 2.1 Anti-patterns to watch for during the port
+
+Several CBK files mix UI and server concerns or assume the browser is the only client. Each must be untangled during port, not copied verbatim:
+
+| CBK pattern | Why it violates API-first | Port action |
+|---|---|---|
+| Server endpoints returning React-component-shaped payloads | Couples API to one renderer | Return normalized resources; let clients shape for display |
+| WebSocket frames carrying UI render hints (e.g. "show as collapsible") | Mixes transport with presentation | Move render hints to `comments.metadata` (§3.5); transport carries data only |
+| Browser-cookie-based session auth | Excludes native/mobile/CLI | Bearer-token auth (already in CBK for agent tokens - extend to user sessions) |
+| Endpoints that only the SettingsPage uses | UI-driven API surface | Either generalize the endpoint or move the logic client-side |
+| Hot reload / dev-only endpoints | UI-tooling coupling | Strip during port; do not ship in the SCUT API |
+
+### 2.2 Client roadmap (informs but does not constrain Phase 0-1)
+
+The API surface must be designed assuming all of these clients will exist:
+
+| Client | Status | Notes |
+|---|---|---|
+| Web UI (React, shipped with server) | Phase 1 (exists) | Default client; one of many |
+| Native desktop (Tauri or Electron) | Future | Same REST + SSE as web; bundles its own UI shell |
+| Mobile (iOS / Android) | Future | Same REST + SSE; push notifications via separate channel |
+| CLI (`scut` command) | Future | Thin wrapper over the public API for scripting and agent harnesses |
+| External agents (A2A, ACP) | Phase 2+ | Authenticate as Replicants via existing agent-token model |
+| External integrations (webhooks in/out) | Future | Out of scope for this plan, but API must not preclude them |
+
+No code lands in this plan for non-web clients. The constraint here is **negative**: no port decision may foreclose any of these clients.
 
 ## 3. Nomenclature: CBK ↔ SCUT
 
@@ -158,7 +193,7 @@ Pieces to port, in rough order of independence. Each becomes its own SCUT phase-
 | 6 | `src/server/acp-session-manager.ts` | `packages/server/src/connectors/AcpConnector.ts` (implements `IReplicantConnector` returning `AgentTaskHandle`) | The piece Bob is currently rewriting per `research/bridge-authoritative-session-state.md`. Wait for that work to land, then port the improved version. ACP session ID + prompt index get encoded into the opaque `connector_handle`. |
 | 7 | `src/server/card-session-manager.ts` | Replaced by `comment_dispatches` table + connector `events()` stream | Do not port as-is. The "what's in flight, what tokens have we seen" state moves to SCUT's dispatch row + connector event stream. |
 | 8 | `src/server/bridge-stream.ts` | `packages/server/src/connectors/CopilotBridgeConnector.ts` | Wrap as the legacy connector. Bridge session ID becomes part of `connector_handle`. Do not extend. |
-| 9 | Admin UI (SettingsPage, agent token manager) | `packages/ui/src/admin/` | Rebrand provider→connector, agent→replicant. |
+| 9 | Admin UI (SettingsPage, agent token manager) | `packages/ui/src/admin/` | Rebrand provider→connector, agent→replicant. **API-first gate**: every action the SettingsPage performs must hit a documented endpoint in `docs/api/openapi.yaml`. No UI-only state mutations. No endpoints that exist solely for the SettingsPage's convenience. If CBK code violates this, fix it during the port - do not copy the violation forward. |
 | 10 | `migration 014-cards-session-transcript.ts` + `last_rendered_turn_index` | Replaced by `comment_dispatches` lifecycle + comment ordering | Do not port the transcript column or the render-cursor column. SCUT reconstructs view state from comments + dispatch rows directly. |
 
 Pieces in CBK that we explicitly **do not** port:
@@ -182,10 +217,12 @@ Each phase ends in a green CI build on SCUT main. No CBK code lands on SCUT main
 
 - Land this document.
 - One spec-amendment PR (separate) updating `docs/spec/spec.md`:
+  - §2 Design Principles (API-First): strengthen the existing principle to **constraint** status - same hard gates as merge-plan §2.1, plus the client roadmap from §2.2.
   - §3 Vocabulary: remove `Run` entry; add `AgentTask` (connector boundary type), `comment_dispatches` (sidecar table), `Harness` (connector kind), `connector_handle` (opaque blob).
   - §6 Data Model: remove `runs` table from entity overview + SQL schema; add `comment_dispatches` table; narrow `comments.metadata` purpose to presentation hints.
   - §10 Connector Interface: replace `Run` type with `AgentTask`/`AgentTaskHandle`; update `IReplicantConnector` signature to the shape in §4 of this plan; add `IPromptAssembler` boundary; add `events()` stream.
   - §6.4 (Run Status Flow): repurpose as `AgentTaskStatus` lifecycle, owned by the connector and surfaced via `dispatch row.status`.
+  - §11 API Surface: note that the OpenAPI doc is the contract for **all** clients (web, native, mobile, CLI, agents) - not just the bundled React UI.
   - Note A2A as primary connector, ACP secondary, CopilotBridge legacy.
 
 ### Phase 1 - Repo and branch setup
