@@ -37,6 +37,7 @@ check "GET /any/route"         200 "$BASE/any/route"
 # v1 API surface - subsequent tasks add real endpoint checks here.
 # Example placeholder once /api/v1/boards exists:
 # check "GET /api/v1/boards"   200 "$BASE/api/v1/boards"
+check "GET /api/v1/replicants" 200 "$BASE/api/v1/replicants"
 
 echo "== summary =="
 if [[ "$FAIL" -gt 0 ]]; then
