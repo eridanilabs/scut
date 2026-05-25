@@ -3,13 +3,13 @@ import { listMessages, createMessage } from '../db/MessageRepo.js';
 import { getThread } from '../db/ThreadRepo.js';
 
 export default async function messageRoutes(app: FastifyInstance) {
-  app.get<{ Params: { threadId: string } }>('/api/threads/:threadId/messages', async (request, reply) => {
+  app.get<{ Params: { threadId: string } }>('/threads/:threadId/messages', async (request, reply) => {
     const thread = getThread(request.params.threadId);
     if (!thread) return reply.status(404).send({ error: 'thread not found' });
     return listMessages(request.params.threadId);
   });
 
-  app.post<{ Params: { threadId: string }; Body: { author: string; authorId?: string | null; content: string; runId?: string | null } }>('/api/threads/:threadId/messages', {
+  app.post<{ Params: { threadId: string }; Body: { author: string; authorId?: string | null; content: string; runId?: string | null } }>('/threads/:threadId/messages', {
     schema: {
       body: {
         type: 'object',

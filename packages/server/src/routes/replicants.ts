@@ -15,11 +15,11 @@ function sanitizeReplicant(replicant: ReplicantRow): Record<string, unknown> {
 }
 
 export default async function replicantRoutes(app: FastifyInstance) {
-  app.get('/api/replicants', async () => {
+  app.get('/replicants', async () => {
     return listReplicants().map(sanitizeReplicant);
   });
 
-  app.get<{ Params: { id: string } }>('/api/replicants/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/replicants/:id', async (request, reply) => {
     const replicant = getReplicant(request.params.id);
     if (!replicant) {
       return reply.status(404).send({ error: 'not found' });
@@ -27,7 +27,7 @@ export default async function replicantRoutes(app: FastifyInstance) {
     return sanitizeReplicant(replicant);
   });
 
-  app.post<{ Body: { name: string; harness: string; config?: Record<string, unknown>; status?: string } }>('/api/replicants', {
+  app.post<{ Body: { name: string; harness: string; config?: Record<string, unknown>; status?: string } }>('/replicants', {
     schema: {
       body: {
         type: 'object',
@@ -59,7 +59,7 @@ export default async function replicantRoutes(app: FastifyInstance) {
     return reply.status(201).send(sanitizeReplicant(created));
   });
 
-  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; harness: string; config: Record<string, unknown>; status: string }> }>('/api/replicants/:id', {
+  app.patch<{ Params: { id: string }; Body: Partial<{ name: string; harness: string; config: Record<string, unknown>; status: string }> }>('/replicants/:id', {
     schema: {
       body: {
         type: 'object',
@@ -96,7 +96,7 @@ export default async function replicantRoutes(app: FastifyInstance) {
     return sanitizeReplicant(updated);
   });
 
-  app.delete<{ Params: { id: string } }>('/api/replicants/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/replicants/:id', async (request, reply) => {
     try {
       removeConnector(request.params.id);
       deleteReplicant(request.params.id);
