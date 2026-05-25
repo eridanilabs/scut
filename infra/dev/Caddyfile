@@ -1,0 +1,37 @@
+# infra/dev/Caddyfile - dev reverse proxy for SCUT.
+# Fronts the Vite dev server (UI) and scut-server (API) on a single origin.
+# Listen on :8080; matches default SCUT_BASE_URL in scripts/smoke.sh.
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:8080 {
+	# API surface (versioned + meta). handle (not handle_path) preserves the
+	# /api prefix so scut-server sees the full path (/api/v1/..., /api/docs).
+	handle /api/* {
+		reverse_proxy localhost:3000
+	}
+
+	# Health checks (served by scut-server)
+	handle /healthz {
+		reverse_proxy localhost:3000
+	}
+	handle /readyz {
+		reverse_proxy localhost:3000
+	}
+
+	# SPA - Vite dev server handles everything else and serves index.html
+	# for unknown routes via its built-in SPA fallback.
+	handle {
+		reverse_proxy localhost:5173
+	}
+
+	encode gzip
+	log {
+		output stderr
+		format console
+		level INFO
+	}
+}
