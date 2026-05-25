@@ -26,6 +26,7 @@ if (existing) {
 } else {
   const created = createReplicant({
     name: REPLICANT_NAME,
+    // harness is one of the post-migration-004 enum values: 'acp' | 'copilot-bridge'.
     harness: 'copilot-bridge',
     config: { webhookUrl: REPLICANT_WEBHOOK_URL, callbackUrl: REPLICANT_CALLBACK_URL, secret: REPLICANT_SECRET },
     status: 'online',

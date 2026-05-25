@@ -1,6 +1,15 @@
 import { nanoid } from 'nanoid';
 import db from './db.js';
 
+export const HARNESS_VALUES = ['acp', 'copilot-bridge'] as const;
+export type Harness = typeof HARNESS_VALUES[number];
+
+export function assertHarness(value: string): asserts value is Harness {
+  if (!(HARNESS_VALUES as readonly string[]).includes(value)) {
+    throw new Error(`invalid harness: ${value}. Allowed: ${HARNESS_VALUES.map(v => `'${v}'`).join(', ')}`);
+  }
+}
+
 export type ReplicantRow = {
   id: string;
   name: string;
@@ -35,6 +44,7 @@ export function createReplicant(fields: {
   autoApprove?: boolean;
   metadata?: Record<string, unknown>;
 }): ReplicantRow {
+  assertHarness(fields.harness);
   const id = nanoid();
   const config = JSON.stringify(fields.config ?? {});
   const status = fields.status ?? 'unknown';
@@ -59,6 +69,9 @@ export function updateReplicant(
     metadata: Record<string, unknown>;
   }>
 ): ReplicantRow | undefined {
+  if (fields.harness !== undefined) {
+    assertHarness(fields.harness);
+  }
   const ALLOWED = new Set(['name', 'harness', 'status', 'url']);
   const setClauses: string[] = [];
   const values: unknown[] = [];

@@ -35,7 +35,7 @@ export default async function replicantRoutes(app: FastifyInstance) {
         additionalProperties: false,
         properties: {
           name: { type: 'string' },
-          harness: { type: 'string' },
+          harness: { type: 'string', enum: ['acp', 'copilot-bridge'] },
           config: { type: 'object' },
           status: { type: 'string' },
         },
@@ -66,7 +66,7 @@ export default async function replicantRoutes(app: FastifyInstance) {
         additionalProperties: false,
         properties: {
           name: { type: 'string' },
-          harness: { type: 'string' },
+          harness: { type: 'string', enum: ['acp', 'copilot-bridge'] },
           config: { type: 'object' },
           status: { type: 'string' },
         },
