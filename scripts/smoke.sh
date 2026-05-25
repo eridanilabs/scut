@@ -38,6 +38,7 @@ check "GET /any/route"         200 "$BASE/any/route"
 # Example placeholder once /api/v1/boards exists:
 # check "GET /api/v1/boards"   200 "$BASE/api/v1/boards"
 check "GET /api/v1/replicants" 200 "$BASE/api/v1/replicants"
+check "GET /api/v1/replicants/:bogus/tokens (404)" 404 "$BASE/api/v1/replicants/__nope__/tokens"
 
 echo "== summary =="
 if [[ "$FAIL" -gt 0 ]]; then
