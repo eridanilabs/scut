@@ -65,6 +65,12 @@ Planned connectors: CopilotBridgeBob (Phase 1), ClaudeCodeBob and A2ABob (Phase 
 
 ---
 
+## Smoke tests
+
+Run `npm run smoke` against a running `npm run dev`. Every new endpoint must add a check line to `scripts/smoke.sh`. Override the target with `SCUT_BASE_URL=...` if the server is not on `http://localhost:8080`.
+
+---
+
 ## License
 
 MIT
