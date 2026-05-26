@@ -9,6 +9,7 @@ import messageRoutes from './routes/messages.js';
 import runRoutes from './routes/runs.js';
 import internalRoutes from './routes/internal.js';
 import traceRoutes from './routes/traces.js';
+import dispatchRoutes from './routes/dispatches.js';
 import { bootstrapConnectors } from './bootstrap/connectors.js';
 
 const API_V1_PREFIX = '/api/v1';
@@ -39,6 +40,7 @@ export async function buildApp(
   await server.register(runRoutes, { prefix: API_V1_PREFIX });
   await server.register(internalRoutes, { prefix: API_V1_PREFIX });
   await server.register(traceRoutes, { prefix: API_V1_PREFIX });
+  await server.register(dispatchRoutes, { prefix: API_V1_PREFIX });
 
   return server;
 }

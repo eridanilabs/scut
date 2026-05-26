@@ -207,6 +207,56 @@ export function insertCommentDispatch(input: {
   return getCommentDispatch(input.id)!;
 }
 
+/**
+ * Patch-style status update for an existing comment_dispatches row.
+ *
+ * Only columns explicitly present in `patch` are updated (`undefined`
+ * skips the column entirely; `null` writes SQL NULL). `updated_at` is
+ * always refreshed to the current canonical UTC ISO timestamp.
+ *
+ * Returns the post-update row, or `undefined` if `id` does not exist.
+ */
+export function updateDispatchStatus(
+  id: string,
+  patch: {
+    status: DispatchStatus;
+    connectorHandle?: string | null;
+    error?: string | null;
+    startedAt?: string | null;
+    completedAt?: string | null;
+  }
+): CommentDispatchRow | undefined {
+  const existing = getCommentDispatch(id);
+  if (!existing) return undefined;
+
+  const setClauses: string[] = ['status = ?'];
+  const params: unknown[] = [patch.status];
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'connectorHandle')) {
+    setClauses.push('connector_handle = ?');
+    params.push(patch.connectorHandle ?? null);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'error')) {
+    setClauses.push('error = ?');
+    params.push(patch.error ?? null);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'startedAt')) {
+    setClauses.push('started_at = ?');
+    params.push(patch.startedAt ?? null);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'completedAt')) {
+    setClauses.push('completed_at = ?');
+    params.push(patch.completedAt ?? null);
+  }
+
+  setClauses.push("updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')");
+
+  const sql = `UPDATE comment_dispatches SET ${setClauses.join(', ')} WHERE id = ?`;
+  params.push(id);
+  db.prepare(sql).run(...params);
+  return getCommentDispatch(id);
+}
+
 export function upsertThreadPermission(
   threadId: string,
   replicantId: string,

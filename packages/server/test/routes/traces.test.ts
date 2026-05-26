@@ -662,7 +662,7 @@ describe('GET /api/v1/traces/:id/events', () => {
     assert.equal(res.statusCode, 403);
   });
 
-  test('501 when permitted but event persistence is disabled', async () => {
+  test('200 with empty events array when permitted and no events stored', async () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/traces/${DISPATCH_READABLE_QUEUED}/events`,
@@ -671,7 +671,47 @@ describe('GET /api/v1/traces/:id/events', () => {
         accept: 'text/event-stream',
       },
     });
-    assert.equal(res.statusCode, 501);
-    assert.deepEqual(res.json(), { error: 'event persistence not yet enabled' });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), { events: [] });
+  });
+
+  test('200 with ordered events when rows exist for the dispatch', async () => {
+    const { appendDispatchEvent } = await import(
+      '../../src/db/DispatchEventRepo.js'
+    );
+    appendDispatchEvent({
+      dispatchId: DISPATCH_READABLE_SUCCEEDED,
+      kind: 'agent_message_chunk',
+      payload: { update: { sessionUpdate: 'agent_message_chunk' }, ix: 1 },
+    });
+    appendDispatchEvent({
+      dispatchId: DISPATCH_READABLE_SUCCEEDED,
+      kind: 'tool_call',
+      payload: { update: { sessionUpdate: 'tool_call' }, ix: 2 },
+    });
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/traces/${DISPATCH_READABLE_SUCCEEDED}/events`,
+      headers: authHeaders(RAW_TOKEN_CALLER),
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as {
+      events: Array<{
+        id: string;
+        sequence: number;
+        kind: string;
+        payload: unknown;
+        created_at: string;
+      }>;
+    };
+    assert.equal(body.events.length, 2);
+    assert.equal(body.events[0].sequence, 1);
+    assert.equal(body.events[0].kind, 'agent_message_chunk');
+    assert.equal(body.events[1].sequence, 2);
+    assert.equal(body.events[1].kind, 'tool_call');
+    assert.deepEqual(body.events[0].payload, {
+      update: { sessionUpdate: 'agent_message_chunk' },
+      ix: 1,
+    });
   });
 });

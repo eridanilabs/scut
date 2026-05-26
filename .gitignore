@@ -43,3 +43,6 @@ coverage/
 
 # Caddy dev cache
 infra/dev/.cache/
+
+# ACP demo scratch
+.scut-acp-demo-work/
