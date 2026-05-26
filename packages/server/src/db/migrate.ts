@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 
 export interface Migration {
-  version: number;        // monotonic, gap-free
+  version: number;        // monotonic, applied in ascending order (gaps allowed)
   name: string;           // kebab-case
   up: (db: Database) => void;
 }

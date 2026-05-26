@@ -1,0 +1,257 @@
+openapi: 3.0.3
+info:
+  title: SCUT API
+  version: "0.1.0"
+  description: |
+    SCUT HTTP API. This document is intentionally minimal: it currently
+    covers only the security scheme used by replicant-authenticated
+    endpoints and the `/api/v1/traces/*` query surface for comment
+    dispatches added in this change. Future PRs will expand coverage to
+    the rest of the API.
+servers:
+  - url: http://localhost:3000
+    description: Local dev server
+security:
+  - replicantBearer: []
+tags:
+  - name: traces
+    description: |
+      Query surface over `comment_dispatches` rows produced when a
+      replicant comment triggers downstream work.
+paths:
+  /api/v1/traces:
+    get:
+      tags: [traces]
+      summary: List comment dispatches readable by the caller
+      description: |
+        Returns dispatches whose `thread_id` the caller has explicit
+        `thread_permissions.can_read = 1` for. Callers without any
+        readable threads receive `200` with an empty list.
+
+        Results are ordered by `(created_at DESC, id DESC)`. The
+        secondary `id DESC` key provides a stable total order across
+        rows that share a `created_at` value (SQLite has millisecond
+        resolution and concurrent inserts can tie). Clients MUST use
+        the opaque `next_cursor` returned by a previous call to
+        traverse pages reliably; relying on `created_at` alone (e.g.
+        via the legacy ISO `before` form) can skip or repeat rows
+        whose timestamps tie at a page boundary.
+      security:
+        - replicantBearer: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: |
+            Maximum rows to return. Default 50, max 200. Must be a
+            positive integer.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: before
+          in: query
+          required: false
+          description: |
+            Pagination bound. Accepts either the opaque `next_cursor`
+            value returned by a previous list call, or a legacy ISO 8601
+            timestamp. Only dispatches strictly older than the supplied
+            position are returned. When omitted, the newest rows are
+            returned.
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, cancelled]
+        - name: replicant_id
+          in: query
+          required: false
+          description: Exact-match filter on `dispatch.replicant_id`.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of dispatches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceListResponse'
+        '400':
+          description: Invalid query parameter.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BadRequestError' }
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnauthorizedError' }
+  /api/v1/traces/{id}:
+    get:
+      tags: [traces]
+      summary: Get a single comment dispatch by id
+      security:
+        - replicantBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The dispatch.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Trace' }
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnauthorizedError' }
+        '403':
+          description: |
+            Dispatch exists but the caller lacks `can_read` permission
+            on its thread.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenError' }
+        '404':
+          description: No dispatch with that id exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotFoundError' }
+  /api/v1/traces/{id}/events:
+    get:
+      tags: [traces]
+      summary: Stream events for a dispatch (not yet enabled)
+      description: |
+        Event persistence is not yet implemented. The endpoint performs
+        auth and permission checks and then returns `501`. This is true
+        regardless of the `Accept` header value (including
+        `text/event-stream`).
+      security:
+        - replicantBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnauthorizedError' }
+        '403':
+          description: Dispatch exists but caller lacks permission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenError' }
+        '404':
+          description: No dispatch with that id exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotFoundError' }
+        '501':
+          description: Event persistence is not yet implemented.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    example: event persistence not yet enabled
+components:
+  securitySchemes:
+    replicantBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Replicant bearer token (raw form, e.g. `scut_rk_...`). The
+        server matches the SHA-256 hash of the raw token against
+        `replicant_tokens.token_hash`.
+  schemas:
+    DispatchStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled]
+    Trace:
+      type: object
+      required:
+        - id
+        - thread_id
+        - replicant_id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id: { type: string }
+        thread_id: { type: string }
+        triggering_comment_id:
+          type: string
+          nullable: true
+        replicant_id: { type: string }
+        status: { $ref: '#/components/schemas/DispatchStatus' }
+        connector_handle:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TraceListResponse:
+      type: object
+      required: [dispatches, next_cursor]
+      properties:
+        dispatches:
+          type: array
+          items: { $ref: '#/components/schemas/Trace' }
+        next_cursor:
+          type: string
+          nullable: true
+          description: |
+            Opaque URL-safe cursor pointing at the last returned row.
+            Pass back as the `before` query parameter on the next call
+            to fetch the next page. `null` when no more rows are
+            available. Format is internal and must be treated as opaque
+            by clients.
+    BadRequestError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: bad_request }
+        message: { type: string }
+    UnauthorizedError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: unauthorized }
+    ForbiddenError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: forbidden }
+    NotFoundError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: not_found }
