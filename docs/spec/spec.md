@@ -866,13 +866,62 @@ To check at runtime: `if ('saveCheckpoint' in connector) { ... }`
 
 ### 10.4 AcpConnector (primary)
 
-`AcpConnector` is the primary `IReplicantConnector` implementation. It speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** over JSON-RPC 2.0 (stdio), driving ACP-capable harnesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents) as subprocesses.
+`AcpConnector` is the primary `IReplicantConnector` implementation. It speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** over JSON-RPC 2.0, framed as NDJSON over a transport selected per Replicant (see §10.5). It drives ACP-capable harnesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents) either as spawned subprocesses (stdio) or as already-running ACP servers reachable on a loopback TCP port.
 
 - Maps ACP `session/prompt` invocations onto `AgentTask`. The opaque `connector_handle` encodes ACP `sessionId` + per-prompt invocation index.
 - Client-side methods implemented: `session/request_permission` (routes through the SCUT permission system), `session/update` (each update becomes a Comment or appends to a streaming Comment).
 - Agent-side methods called: `initialize`, `session/new`, `session/prompt`, `session/cancel`. `session/load` if the Agent advertises it.
+- Built on the official `@agentclientprotocol/sdk` TypeScript library (`ClientSideConnection`, `ndJsonStream`); see https://agentclientprotocol.com/libraries/typescript.
 
-See the CBK→SCUT merge plan (`docs/spec/cbk-merge-plan.md`) §4 for the full Connector roadmap, including the legacy `CopilotBridgeConnector` (`harness='copilot-bridge'`).
+See §10.5 for the binding transport contract and §12 for harness configuration. See the CBK→SCUT merge plan (`docs/spec/cbk-merge-plan.md`) §4 for the full Connector roadmap, including the legacy `CopilotBridgeConnector` (`harness='copilot-bridge'`).
+
+### 10.5 ACP Transport (binding)
+
+> **Amendment note (bill-hwl):** This section supersedes the prior implicit assumption (carried over from CBK) that a Connector might reach its harness over a bespoke HTTP + WebSocket channel. For ACP harnesses, the only spec-conformant transports are NDJSON-framed JSON-RPC 2.0 over loopback TCP or stdio. Custom HTTP/WS bridges are not a SCUT transport. The legacy `CopilotBridgeConnector` (§12) is the sole, deprecated exception, retained for migration continuity only.
+
+#### 10.5.1 Supported transports
+
+The ACP server side is provided by an ACP-conformant process (for example, GitHub Copilot CLI's `copilot --acp` server, documented at https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server). The Connector side speaks to it through one of two transports:
+
+| Transport | Server invocation (reference: Copilot CLI) | Connector behaviour |
+|---|---|---|
+| **TCP** (primary, near-term) | `copilot --acp --port <n>` | Connector dials a loopback TCP port. NDJSON frames each JSON-RPC 2.0 message. |
+| **stdio** (follow-on) | `copilot --acp --stdio` (or `copilot --acp`, which defaults to stdio per the Copilot CLI docs) | Connector spawns the ACP server as a child process and pipes its stdin/stdout. NDJSON frames each JSON-RPC 2.0 message. |
+
+Both transports use the `@agentclientprotocol/sdk` `ndJsonStream(output, input)` helper plus `new ClientSideConnection(clientFactory, stream)` on the client side. See https://agentclientprotocol.com/protocol/overview and https://agentclientprotocol.com/libraries/typescript.
+
+#### 10.5.2 Transport-selection policy
+
+- **Default**: TCP. Matches the near-term direction of the CBK transport refit (sibling work tracked separately) and lets the ACP server run as a managed local service independent of the Connector lifecycle.
+- **Configurable per Replicant**: `replicants.config.transport: 'tcp' | 'stdio'` (JSON column). If absent, the Connector defaults to `'tcp'`.
+- **Deployment-wide override**: an environment variable (`SCUT_ACP_TRANSPORT_DEFAULT`) may set the default for Replicants whose config omits `transport`.
+- **Security**: when `transport='tcp'`, the Connector MUST bind to and dial loopback only (`127.0.0.1` or `::1`); it MUST refuse non-loopback addresses. The ACP process is local-trust and is gated by the Connector; Replicant token auth (§7) remains server-side and is unchanged by this section.
+- **Preference**: stdio is preferred for production once supported, because process lifetime, stdin/stdout closure, and OS-level isolation give cleaner failure semantics than a long-lived loopback socket.
+
+#### 10.5.3 Mapping SCUT primitives onto ACP
+
+The following mappings are binding. Connector implementations MUST honour them.
+
+| SCUT primitive | ACP element | Binding behaviour |
+|---|---|---|
+| `comment_dispatches` row lifecycle (§6.4) | ACP session lifecycle: `newSession` → `prompt` → terminal `stopReason` | `queued` → `running` once the Connector has either (a) reused an existing ACP `sessionId` or completed `newSession`, **and** issued `prompt`. `running` → `succeeded` iff the `prompt` result has `stopReason === 'end_turn'`. `running` → `failed` for any other terminal `stopReason` other than an explicit cancellation, or on stream/transport error. `running` → `cancelled` iff SCUT issued `session/cancel` (via `IReplicantConnector.cancel(handle)`) and the prompt terminated as a result. |
+| Persisted event stream (Phase 2.5 traces) | ACP `sessionUpdate` notifications (client-side `Client.sessionUpdate` callback) | Each `sessionUpdate` notification persists as one event row, ordered by arrival sequence within the dispatch. Event kinds covered include at least `agent_message_chunk`, `tool_call`, `tool_call_update`, plus any further `sessionUpdate` variants the SDK exposes. SCUT does not reinterpret payloads; it stores them verbatim and renders via `comments.metadata` (§3.5). |
+| `replicant_permissions` decisions (per CBK merge plan §5, port unit 4) | ACP `requestPermission` (client-side `Client.requestPermission` callback) | The Connector applies the server-side permission policy stored on the Replicant. Outcome shape returned to ACP: `{ outcome: { outcome: 'allowed' \| 'denied' \| 'cancelled' } }`. No permission decision is made client-side or in the UI on the hot path; the UI may surface a pending request for human resolution and post the answer back through the same server-side policy store. |
+| Replicant token auth (§7) | Unchanged | The ACP process is local-trust and is reached only over loopback/stdio; it does not authenticate against SCUT. SCUT's bearer-token model gates the public API, including any inbound surfaces. |
+
+#### 10.5.4 Substrate (bill-1i7) implications
+
+The forthcoming Substrate abstraction (tracked in Beads `bill-1i7`) MUST encode "ACP transport: stdio | NDJSON-framed JSON-RPC 2.0 over loopback TCP" as a hard constraint on any Substrate that hosts a Copilot-CLI-class agent. A Substrate that cannot expose at least one of these two transports cannot host the primary `AcpConnector`. This subsection constrains, but does not block, `bill-1i7`.
+
+#### 10.5.5 Deprecations
+
+The following Connector concepts are removed from the SCUT transport story by this amendment:
+
+- Any notion that the primary outbound Connector reaches its harness via HTTP request/response. SCUT's HTTP surface remains, but it is inbound (§11), not the Connector channel.
+- Any notion that the primary outbound Connector reaches its harness via WebSocket. SSE (§8) remains the documented client-facing real-time channel; WebSocket is not the Connector channel.
+- CBK's bespoke `copilot-bridge` HTTP + WebSocket channel as a forward direction. It survives only as `CopilotBridgeConnector` (§12), explicitly deprecated, retained for migration continuity, not extended.
+
+Anything CBK ships in HTTP/WS form for its own purposes that does NOT survive the port to SCUT must be re-expressed against ACP transport per this section before landing in SCUT.
 
 ---
 
@@ -1046,19 +1095,24 @@ For external A2A-speaking agents (future, optional), an inbound surface at `/api
 
 ### `AcpConnector` (Phase 2+, primary)
 
-Speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** over JSON-RPC 2.0 (stdio), driving ACP-capable harnesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents) as subprocesses. Implements `IReplicantConnector` per §10.4.
+Speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** over JSON-RPC 2.0, framed as NDJSON over the transport selected per Replicant (see §10.5). Drives ACP-capable harnesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents). Implements `IReplicantConnector` per §10.4. Built on `@agentclientprotocol/sdk` (`ClientSideConnection`, `ndJsonStream`).
 
 - Harness type: `acp`
-- Transport: subprocess (stdio, JSON-RPC 2.0)
-- Config: `{ command: string, args?: string[], env?: Record<string, string> }`
+- Transport (binding, per §10.5): `'tcp'` (primary, loopback only) or `'stdio'` (follow-on, child-process pipes). Default `'tcp'`.
+- Config:
+  - Common: `{ transport: 'tcp' | 'stdio' }`
+  - When `transport='tcp'`: `{ host?: '127.0.0.1' | '::1' (default '127.0.0.1'), port: number }`. The port may be ephemeral; the ACP server is expected to be launched out-of-band (for example, `copilot --acp --port <n>`).
+  - When `transport='stdio'`: `{ command: string, args?: string[], env?: Record<string, string> }`. The Connector spawns the server and pipes stdin/stdout.
 - Opaque `connector_handle` encodes ACP `sessionId` + per-prompt invocation index.
+- Client-side callbacks (mapped per §10.5.3): `requestPermission` against `replicant_permissions`; `sessionUpdate` persisted as event rows.
+- Reference for the server side of this contract (Copilot CLI): https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server.
 
-### `CopilotBridgeConnector` (Phase 2, legacy)
+### `CopilotBridgeConnector` (Phase 2, legacy; deprecated)
 
-Wraps the existing copilot-bridge WebSocket channel as a legacy `IReplicantConnector`. Kept for migration continuity only; deprecated. Sunset target: when ACP coverage is verified across the harnesses the bridge currently serves.
+Wraps the existing copilot-bridge HTTP + WebSocket channel as a legacy `IReplicantConnector`. Kept for migration continuity only; **deprecated on landing** and **not** a SCUT-conformant transport (see §10.5.5). Sunset target: when ACP coverage (§10.4, §10.5) is verified across the harnesses the bridge currently serves.
 
 - Harness type: `copilot-bridge`
-- Transport: WebSocket (copilot-bridge's own channel adapter)
+- Transport: HTTP + WebSocket (copilot-bridge's own bespoke channel adapter). This is the transport SCUT explicitly amends out of the forward design; do not extend.
 - Config: `{ baseUrl: string, channelId: string, token: string }`
 - Opaque `connector_handle` encodes the bridge session ID.
 
@@ -1113,8 +1167,8 @@ Additional harness kinds (e.g. a generic subprocess connector, a direct CLI wrap
 - `IPromptAssembler` interface and a default in-process implementation
 - `ICheckpointProvider` interface (optional; implemented by connectors that support checkpointing)
 - `checkpoints` table + SQLiteRepository module
-- `AcpConnector` (primary; speaks Agent Client Protocol per https://agentclientprotocol.com/)
-- `CopilotBridgeConnector` (legacy)
+- `AcpConnector` (primary; speaks Agent Client Protocol per https://agentclientprotocol.com/, NDJSON over loopback TCP by default, stdio follow-on, per §10.5)
+- `CopilotBridgeConnector` (legacy, deprecated on landing per §10.5.5)
 - Connector registry (`Map<replicantId, IReplicantConnector>`, initialized at startup from `replicants` table)
 - `POST /api/v1/threads/:id/comments`: add auto-dispatch logic (if `assignee_type='replicant'`, create `comment_dispatches` row, call `connector.dispatch`, consume `events()` stream)
 - Dispatches API endpoints (§11.11)
