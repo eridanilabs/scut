@@ -7,17 +7,18 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "seed": "tsx src/seed-replicant.ts",
-    "test": "node --import tsx --test test/**/*.test.ts"
+    "test": "bash -O globstar -c 'node --import tsx --test test/**/*.test.ts'"
   },
   "dependencies": {
-    "fastify": "^4.28.0",
+    "@agentclientprotocol/sdk": "^0.22.1",
     "better-sqlite3": "^9.6.0",
+    "fastify": "^4.28.0",
     "nanoid": "^5.0.7"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
-    "@types/node": "^20.12.12",
     "@types/better-sqlite3": "^7.6.10",
-    "tsx": "^4.11.0"
+    "@types/node": "^20.12.12",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.5"
   }
 }

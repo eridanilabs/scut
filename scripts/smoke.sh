@@ -76,7 +76,7 @@ check "GET /api/v1/traces (auth -> 200)"        200 -H "$AUTH_HDR" "$BASE/api/v1
 check "GET /api/v1/traces?status=bogus (400)"   400 -H "$AUTH_HDR" "$BASE/api/v1/traces?status=bogus"
 check "GET /api/v1/traces/$SCUT_TRACE_ID (200)" 200 -H "$AUTH_HDR" "$BASE/api/v1/traces/$SCUT_TRACE_ID"
 check "GET /api/v1/traces/__nope__ (404)"       404 -H "$AUTH_HDR" "$BASE/api/v1/traces/__nope__"
-check "GET /api/v1/traces/$SCUT_TRACE_ID/events (501)" 501 -H "$AUTH_HDR" "$BASE/api/v1/traces/$SCUT_TRACE_ID/events"
+check "GET /api/v1/traces/$SCUT_TRACE_ID/events (200)" 200 -H "$AUTH_HDR" "$BASE/api/v1/traces/$SCUT_TRACE_ID/events"
 
 echo "== summary =="
 if [[ "$FAIL" -gt 0 ]]; then

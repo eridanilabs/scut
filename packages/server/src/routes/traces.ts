@@ -10,6 +10,7 @@ import {
   listCommentDispatches,
   replicantCanReadThread,
 } from '../db/CommentDispatchRepo.js';
+import { listDispatchEvents } from '../db/DispatchEventRepo.js';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -240,9 +241,10 @@ export default async function traceRoutes(app: FastifyInstance) {
     }
   );
 
-  // GET /traces/:id/events - event persistence not yet enabled.
-  // Even when Accept includes text/event-stream we still respond 501
-  // because no underlying event store exists.
+  // GET /traces/:id/events - return the persisted dispatch event log
+  // for a single dispatch in sequence order. Authorization mirrors
+  // GET /traces/:id (caller must have a thread_permissions row on the
+  // dispatch's thread).
   app.get<{ Params: { id: string } }>(
     '/traces/:id/events',
     { preHandler: requireReplicantAuth },
@@ -255,9 +257,22 @@ export default async function traceRoutes(app: FastifyInstance) {
       if (!replicantCanReadThread(row.thread_id, replicant.id)) {
         return reply.status(403).send({ error: 'forbidden' });
       }
-      return reply
-        .status(501)
-        .send({ error: 'event persistence not yet enabled' });
+      const events = listDispatchEvents(row.id).map((ev) => ({
+        id: ev.id,
+        sequence: ev.sequence,
+        kind: ev.kind,
+        payload: safeParseJson(ev.payload),
+        created_at: ev.created_at,
+      }));
+      return reply.send({ events });
     }
   );
+}
+
+function safeParseJson(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return s;
+  }
 }
