@@ -7,6 +7,7 @@ Related: `docs/spec/spec.md`, dark-factory `research/scut-pm-experience.md`
 
 ### Revision log
 
+- **draft 6 (2026-05-26)**: Connector transport amendment (Beads `bill-hwl`). Replaces the implicit "subprocess stdio only" assumption (carried in via CBK's `AcpSessionManager`) and CBK's bespoke HTTP + WebSocket channel with the real ACP transport contract: NDJSON-framed JSON-RPC 2.0 over loopback TCP (primary) or stdio (follow-on), driven by the `@agentclientprotocol/sdk` (`ClientSideConnection`, `ndJsonStream`) on the Client side. Adds new spec §10.5 (ACP Transport, binding) to `docs/spec/spec.md`; updates spec §10.4 and §12 entries for `AcpConnector` and `CopilotBridgeConnector` accordingly. Updates merge-plan §4.1 row, §4.4 sketch, §4.5 (new: Substrate / `bill-1i7` implications), and Phase 3 detail to point at the binding transport spec. References: https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server, https://agentclientprotocol.com/protocol/overview, https://agentclientprotocol.com/libraries/typescript. Does NOT (re-)author the Phase 3 Connector implementation; a follow-on Beads task will re-spec that against the new transport contract.
 - **draft 5 (2026-05-25)**: ACP naming-collision correction. The "ACP" we are building against is **Agent Client Protocol** (https://agentclientprotocol.com/) - the JSON-RPC 2.0 protocol where SCUT acts as the **Client** and harnesses (Claude Code, Codex, Copilot CLI with `--acp`) act as the **Agent**. CBK's `AcpSessionManager` already speaks this. This is unrelated to the IBM "ACP" that merged into A2A. Connector hierarchy flips: **ACP is now primary**, CopilotBridge legacy, A2A is no longer treated as a primary outbound connector. A2A becomes the **inbound agent-to-SCUT surface** for delegation/handoff (a public API surface, complementary, optional). New §4.2 (SCUT as ACP Client - capability surface). New §4.3 (Inbound agent surfaces: REST + A2A). Phase 3 swapped: ACP primary, A2A inbound deferred.
 - **draft 4 (2026-05-25)**: Reverse-proxy deployment topology + versioned API path (`/api/v1/...`) as part of API-first. SPA-fallback rule for the web client. API-first testability rule: every server endpoint must be exercisable via curl/REST and have a curl-based test or example **before** UI code consumes it. New §2.3 (deployment topology) and §2.4 (testability gate).
 - **draft 3 (2026-05-25)**: Elevate API-first to constraint #1 (was a SCUT spec §2 principle, not a merge-plan gate). Add §2.1 (port anti-patterns: UI-coupled endpoints, browser-only auth, render hints in transport) and §2.2 (client roadmap: web/native/mobile/CLI/agents/webhooks). UI port unit constraint added in §5.
@@ -211,8 +212,8 @@ Rule of thumb: if a backend cron / dashboard / "stuck task sweeper" would ever w
 
 | Connector | Status | Harness kind | Notes |
 |---|---|---|---|
-| `AcpConnector` | **primary** | `acp` | Speaks [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client**. Spawns ACP-capable agents as subprocesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents) and drives them via JSON-RPC 2.0 over stdio. Ported from CBK's `AcpSessionManager` (post-Bob-refactor per `research/bridge-authoritative-session-state.md`). |
-| `CopilotBridgeConnector` | legacy, deprecated | `copilot-bridge` | Wraps the existing CBK WebSocket channel. Kept for migration continuity only. Sunset target: when ACP coverage is verified across the harnesses bridge currently serves. |
+| `AcpConnector` | **primary** | `acp` | Speaks [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client**, NDJSON-framed JSON-RPC 2.0 over loopback TCP (primary, near-term) or stdio (follow-on), per spec §10.5. Built on `@agentclientprotocol/sdk` (`ClientSideConnection`, `ndJsonStream`). Drives ACP-capable harnesses (Claude Code, Codex, Copilot CLI with `--acp`, Zed-compatible agents). Ported from CBK's `AcpSessionManager` (post-Bob-refactor per `research/bridge-authoritative-session-state.md`), re-fronted onto the real ACP transport. |
+| `CopilotBridgeConnector` | legacy, deprecated | `copilot-bridge` | Wraps the existing CBK HTTP + WebSocket channel. This channel is NOT a SCUT-conformant transport (see spec §10.5.5); the connector exists only for migration continuity. Sunset target: when ACP coverage is verified across the harnesses bridge currently serves. |
 
 ### 4.2 SCUT as ACP Client (capability surface)
 
@@ -286,6 +287,11 @@ Connector deltas vs current spec §10:
 
 - **Add an `IPromptAssembler` boundary** so SCUT (not the connector) assembles the layered prompt (board / column / card / instruction-node stack from `scut-pm-experience.md`). The connector receives a finished `AssembledPrompt`, not raw turns. Defined in the prompt-stack research doc.
 - **No `Run` type passed in.** The dispatch arguments are explicit: thread, triggering comment, assembled prompt. The dispatch row is SCUT-internal and never crosses the boundary.
+- **Transport is fixed by spec §10.5.** For the `acp` harness, the Connector MUST use NDJSON-framed JSON-RPC 2.0 over loopback TCP (default) or stdio (follow-on), driven by `@agentclientprotocol/sdk`. No HTTP request/response and no WebSocket transport is permitted for an ACP harness; see spec §10.5.5 for the deprecation list.
+
+### 4.5 Substrate (bill-1i7) implications
+
+The Substrate abstraction tracked in Beads `bill-1i7` MUST encode "ACP transport: stdio | NDJSON-framed JSON-RPC 2.0 over loopback TCP" as a hard constraint on any Substrate that hosts a Copilot-CLI-class agent. A Substrate that cannot expose at least one of these two transports cannot host the primary `AcpConnector`. This is a forward-looking constraint, not a blocker on `bill-1i7`; the Substrate design is free to add more transports, but those two are the floor for ACP-class harnesses.
 
 ## 5. What's in CBK that SCUT Needs
 
@@ -351,12 +357,14 @@ Each phase ends in a green CI build on SCUT main. No CBK code lands on SCUT main
 
 ### Phase 3 - ACP connector (primary, port unit 6)
 
-- Port `AcpSessionManager` from CBK into `packages/server/src/connectors/AcpConnector.ts`. Implements `IReplicantConnector`. Speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** per §4.2.
-- Implements Client-side methods: `session/request_permission` (routes through SCUT permission system), `session/update` (each update becomes a Comment or appends to streaming Comment).
+- Port `AcpSessionManager` from CBK into `packages/server/src/connectors/AcpConnector.ts`. Implements `IReplicantConnector`. Speaks the [Agent Client Protocol](https://agentclientprotocol.com/) as the **Client** per §4.2, over the binding transport contract in spec §10.5: NDJSON-framed JSON-RPC 2.0 over loopback TCP (primary, near-term) or stdio (follow-on). Built on `@agentclientprotocol/sdk` (`ClientSideConnection`, `ndJsonStream`) - see https://agentclientprotocol.com/libraries/typescript.
+- Implements Client-side callbacks: `requestPermission` (server-side decision against `replicant_permissions`, returns `{ outcome: { outcome: 'allowed' | 'denied' | 'cancelled' } }`), `sessionUpdate` (each notification persisted as one event row, ordered by sequence; covers `agent_message_chunk`, `tool_call`, `tool_call_update`, etc.).
 - Calls Agent-side methods: `initialize`, `session/new`, `session/prompt`, `session/cancel`. `session/load` if advertised.
-- Reference harnesses for testing: Claude Code, Codex, Copilot CLI with `--acp`. At least two of the three must pass smoke tests before this phase is considered done.
+- Dispatch lifecycle maps onto ACP per spec §10.5.3: `queued` → `running` on `newSession`+`prompt` start; `succeeded` iff `stopReason === 'end_turn'`; `failed` or `cancelled` otherwise.
+- Reference ACP server for testing: GitHub Copilot CLI's ACP mode (`copilot --acp --port <n>` for TCP, `copilot --acp --stdio` for stdio; see https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server). Additional reference harnesses: Claude Code, Codex. At least two reference harnesses must pass smoke tests before this phase is considered done.
 - Encodes ACP `sessionId` + per-prompt invocation index into the opaque `connector_handle` on `comment_dispatches`.
-- **Wait for Bob's bridge-authoritative-state refactor to settle** before porting; we want the improved version, not the current one.
+- TCP transport MUST bind/dial loopback only (`127.0.0.1` or `::1`).
+- **Wait for Bob's bridge-authoritative-state refactor to settle** before porting; we want the improved version, not the current one. The connector implementation itself is re-spec'd in a follow-on Beads task against this transport contract; this amendment defines the contract, not the implementation.
 - Lands with full `IReplicantConnector` test coverage and curl-exercisable dispatch endpoint.
 
 ### Phase 4 - CopilotBridge legacy connector (port unit 8)
