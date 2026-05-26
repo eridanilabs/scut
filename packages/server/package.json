@@ -7,7 +7,7 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "seed": "tsx src/seed-replicant.ts",
-    "test": "node --import tsx --test test/routes/*.test.ts"
+    "test": "node --import tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "fastify": "^4.28.0",

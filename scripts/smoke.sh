@@ -62,6 +62,7 @@ fi
 # check "GET /api/v1/boards"   200 "$BASE/api/v1/boards"
 check "GET /api/v1/replicants" 200 "$BASE/api/v1/replicants"
 check "GET /api/v1/replicants/:bogus/tokens (404)" 404 "$BASE/api/v1/replicants/__nope__/tokens"
+check "GET /api/v1/replicants/:bogus/permissions (404)" 404 "$BASE/api/v1/replicants/__nope__/permissions"
 
 # Traces (Phase 2.5). Requires bearer auth. The dev seed (SCUT_SEED_SMOKE=1)
 # creates a deterministic replicant + token + dispatch so these checks pass

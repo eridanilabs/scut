@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(here, '..', '.test-data');
 fs.mkdirSync(dataDir, { recursive: true });
 
-const dbFile = path.join(dataDir, `traces-${process.pid}-${Date.now()}.db`);
+const dbFile = path.join(dataDir, `test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.db`);
 for (const ext of ['', '-wal', '-shm']) {
   try {
     fs.unlinkSync(dbFile + ext);

@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import replicantRoutes from './routes/replicants.js';
 import replicantTokenRoutes from './routes/replicantTokens.js';
+import replicantPermissionRoutes from './routes/replicantPermissions.js';
 import threadRoutes from './routes/threads.js';
 import messageRoutes from './routes/messages.js';
 import runRoutes from './routes/runs.js';
@@ -32,6 +33,7 @@ export async function buildApp(
 
   await server.register(replicantRoutes, { prefix: API_V1_PREFIX });
   await server.register(replicantTokenRoutes, { prefix: API_V1_PREFIX });
+  await server.register(replicantPermissionRoutes, { prefix: API_V1_PREFIX });
   await server.register(threadRoutes, { prefix: API_V1_PREFIX });
   await server.register(messageRoutes, { prefix: API_V1_PREFIX });
   await server.register(runRoutes, { prefix: API_V1_PREFIX });
